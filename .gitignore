@@ -6,3 +6,6 @@ node_modules/
 # written by Claude Code when it loads the messenger (machine-specific, regenerated)
 messenger/.claude-plugin/types/
 messenger/tsconfig.json
+# screenshot tool: generated page, npm files
+tools/screenshot/demo.html
+tools/screenshot/package-lock.json

@@ -1,0 +1,39 @@
+// Made-up example crew for the README screenshot: generic projects, no real sessions or names.
+const now = Date.now();
+const S = (id, title, project, state, hosts, ageS, role, extra = {}) => Object.assign({
+  id, title, startCwd: '/home/dev/' + project, cwd: '/home/dev/' + project, project, state, hosts, ageS,
+  auto: role, role: '', desc: role, group: '', branch: 'main', size: 2.4e6, needsYou: false, activity: '', file: '',
+  keeper: '', mtime: now - ageS * 1000,
+}, extra);
+module.exports = {
+  sessions: [
+    S('a1f3c9d2-1', 'Checkout flow redesign', 'shop-frontend', 'busy', ['vscode'], 3,
+      'Rebuilds the checkout pages in React with the new payment form and its tests.', { activity: 'editing CartSummary.tsx', branch: 'feat/checkout' }),
+    S('b7e2d401-2', 'Fix flaky login test', 'shop-frontend', 'idle', ['vscode'], 140,
+      'Tracks down why the login end-to-end test fails one run in ten.', { needsYou: true }),
+    S('c3a9f7e5-3', 'Design tokens update', 'shop-frontend', 'idle', ['vscode'], 600,
+      'Moves the colour and spacing scale into one tokens file shared by all apps.'),
+    S('d84b21c6-4', 'Payments API v2', 'payments-api', 'busy', ['vscode'], 2,
+      'Adds idempotent refunds and webhooks to the payments service.', { activity: 'running tests', branch: 'refunds-v2' }),
+    S('e55c03a7-5', 'Nightly data import', 'payments-api', 'idle', ['machine'], 900,
+      'Keeps the nightly import of exchange rates running and reports failures.'),
+    S('f0d1b2a8-6', 'Rate limiting', 'payments-api', 'offline', [], 3 * 3600,
+      'Adds per-customer rate limits in front of the public endpoints.'),
+    S('a9c4e3f1-7', 'Release notes 2.4', 'docs-site', 'idle', ['vscode'], 1200,
+      'Writes the 2.4 release notes and updates the migration guide.'),
+    S('b2f6a7c3-8', 'Search for the docs', 'docs-site', 'offline', [], 26 * 3600,
+      'Adds full-text search to the documentation site.'),
+    S('c7e8d9f0-9', 'CI pipeline cleanup', 'infra', 'idle', ['machine'], 1800,
+      'Speeds up the CI pipeline by caching dependencies between jobs.'),
+    S('d1a2b3c4-10', 'Postgres upgrade plan', 'infra', 'offline', [], 3 * 86400,
+      'Plans the upgrade from Postgres 14 to 16 with zero downtime.'),
+  ],
+  keeper: { running: true, mode: 'allowlist', allow: ['e55c03a7-5', 'c7e8d9f0-9', 'a1f3c9d2-1'],
+    chats: { 'e55c03a7-5': { status: 'active', holder: 'keeper', onMachine: true, managed: true },
+             'c7e8d9f0-9': { status: 'active', holder: 'keeper', onMachine: true, managed: true },
+             'a1f3c9d2-1': { status: 'active', holder: 'vscode', onMachine: false, managed: true } }, trash: [] },
+  chips: ['Status?', 'Continue', 'Summarise where you are in 5 lines', 'Stop after this step', 'Commit your work', 'What do you need from me?'],
+  replies: { 'd84b21c6-4': 'Refund endpoint done, 41 tests pass; webhooks next.' },
+  messenger: true, messengerStatus: 'on', critter: 'bot',
+  active: [{ rid: 'demo', kind: 'handover', a: 'a1f3c9d2-1', b: 'c3a9f7e5-3', waiting: 'c3a9f7e5-3', turn: 0, rounds: 0 }],
+};

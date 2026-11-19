@@ -1,0 +1,13 @@
+{
+  "name": "crewmon-screenshot",
+  "private": true,
+  "description": "Builds the README screenshots of CrewMon from made-up example agents",
+  "license": "MIT",
+  "scripts": {
+    "setup": "npx playwright@1.48.2 install chromium",
+    "shoot": "node build-demo.js && node shoot.js"
+  },
+  "dependencies": {
+    "playwright": "1.48.2"
+  }
+}

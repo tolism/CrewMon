@@ -57,7 +57,11 @@
   .node svg { overflow: visible; pointer-events: none; }
   .node .t { width: 100%; text-align: center; font-size: 12px; line-height: 1.25; max-height: 3.75em; overflow: hidden; margin-top: 4px; overflow-wrap: anywhere; }
   .node .s { color: var(--muted); font-size: 11px; margin-top: 2px; }
-  .bubble { position: absolute; top: 2px; left: 50%; transform: translateX(-50%); max-width: 140px; white-space: nowrap; overflow: hidden;
+  #main .node .s.convo { color: var(--busy); font-weight: 600; }
+  #arrowpills { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 5; pointer-events: none; }
+  .arrowpill { position: absolute; transform: translateX(-50%); white-space: nowrap; font-size: 11px; font-weight: 600; color: #fff;
+    background: var(--busy); border-radius: 999px; padding: 1px 8px; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+  .bubble { position: absolute; top: 2px; left: 50%; transform: translateX(-50%); max-width: 190px; white-space: nowrap; overflow: hidden;
     text-overflow: ellipsis; font-size: 10.5px; background: var(--card); border: 1px solid var(--border); border-radius: 9px; padding: 1px 7px; color: var(--fg); }
   .bubble.reply { border-color: var(--accent); }
   .badge { position: absolute; top: 26px; right: 30px; width: 18px; height: 18px; border-radius: 50%; background: var(--alert); color: #fff;
@@ -176,12 +180,12 @@
 
   /* the map: rooms */
   #groups { display: flex; flex-direction: column; gap: var(--s4); padding: var(--s4) 22px 90px; }
-  .group { background: var(--room); border: 1px solid var(--room-line); border-radius: var(--r3); padding: 10px 14px 14px; backdrop-filter: blur(6px); }
+  .group { position: relative; background: var(--room); border: 1px solid var(--room-line); border-radius: var(--r3); padding: 10px 14px 14px; }
   .group h2 { margin: 0 0 8px; display: flex; align-items: baseline; gap: 8px; color: var(--fg); font-size: 11.5px; }
   .group h2 span { color: var(--muted); font-weight: 400; letter-spacing: 0; text-transform: none; }
   #main .group h2, #main .node .t { color: var(--fg); } #main .node .s { color: var(--muted); }
   .row { gap: 10px; }
-  .node { width: 140px; border-radius: var(--r3); transition: transform .14s, background .14s, border-color .14s; }
+  .node { z-index: 2; width: 140px; border-radius: var(--r3); transition: transform .14s, background .14s, border-color .14s; }
   .node:hover { transform: translateY(-2px); background: var(--soft); }
   #free .node { background: var(--room); border: 1px solid var(--room-line); backdrop-filter: blur(6px); }
   .node.sel { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--room)); }
@@ -376,13 +380,19 @@ function drawArrows() {
   let svg = $('arrows');
   if (!svg) {
     svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.id = 'arrows';
-    svg.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;overflow:visible;z-index:3';
+    svg.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;overflow:visible;z-index:1';
     svg.innerHTML = '<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--busy)"/></marker></defs><g id="arrowg"></g>';
     main.appendChild(svg);
   }
   svg.setAttribute('width', main.scrollWidth); svg.setAttribute('height', main.scrollHeight);
   const g = svg.querySelector('#arrowg'); g.innerHTML = '';
+  let layer = $('arrowpills');
+  if (!layer) { layer = document.createElement('div'); layer.id = 'arrowpills'; main.appendChild(layer); }
   const mr = main.getBoundingClientRect();
+  const pills = [];
+  // what the labels must not cover: every critter tile and its bubble
+  const blocks = [...document.querySelectorAll('.node')].map(n => { const r = n.getBoundingClientRect();
+    return { l: r.left - mr.left + main.scrollLeft - 4, r: r.right - mr.left + main.scrollLeft + 4, t: r.top - mr.top + main.scrollTop - 4, b: r.bottom - mr.top + main.scrollTop }; });
   const center = (id) => { const n = document.querySelector('.node[data-id="' + id + '"]'); if (!n) return null;
     const r = n.getBoundingClientRect(); return { x: r.left - mr.left + main.scrollLeft + r.width / 2, y: r.top - mr.top + main.scrollTop + 56 }; };
   for (const a of active) {
@@ -390,11 +400,15 @@ function drawArrows() {
     const p = center(a.a), q = center(a.b); if (!p || !q) continue;
     const towardsB = a.waiting === a.b;
     const [s, t] = towardsB ? [p, q] : [q, p];
-    const mx = (s.x + t.x) / 2, my = Math.min(s.y, t.y) - 40;
-    const label = a.kind === 'talk' ? 'talk ' + a.turn + '/' + a.rounds : a.kind;
+    const mx = (s.x + t.x) / 2, my = Math.min(s.y, t.y) - 70 - Math.abs(s.x - t.x) * 0.08;
+    const apexY = (s.y + 2 * my + t.y) / 4;   // where the curve peaks
+    const label = a.kind === 'talk' ? 'talking ' + a.turn + '/' + a.rounds : a.kind === 'handover' ? 'hand-over' : a.kind === 'ask' ? 'asking' : 'message';
     g.innerHTML += '<path d="M' + s.x + ' ' + s.y + ' Q' + mx + ' ' + my + ' ' + t.x + ' ' + t.y + '" fill="none" stroke="var(--busy)" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#ah)"><animate attributeName="stroke-dashoffset" from="20" to="0" dur="1s" repeatCount="indefinite"/></path>' +
-      '<text x="' + mx + '" y="' + (my + 14) + '" fill="var(--busy)" font-size="11" text-anchor="middle">' + label + '</text>';
+      '';
+    // the label: a small pill near the arrowhead, above the critters (point at t = 0.8 on the curve)
+    void label;   // the words go into the two agents' status lines (nodeHTML)
   }
+  layer.innerHTML = pills.join('');
 }
 $('main').addEventListener('scroll', () => drawArrows());
 
@@ -417,6 +431,17 @@ function shown() {
   return sessions.filter(s => (!live || s.state !== 'offline') && (!stateFilter || bucket(s) === stateFilter) &&
     (!q || (s.title + ' ' + s.id + ' ' + s.startCwd + ' ' + role(s) + ' ' + s.group).toLowerCase().includes(q)));
 }
+function convoLine(s) {   // this agent's part in a conversation in progress, if any
+  for (const a of active) {
+    const isA = a.a === s.id, isB = a.b === s.id;
+    if (!isA && !isB) continue;
+    if (a.kind === 'handover') return isA ? 'handing over' : 'taking over';
+    if (a.kind === 'ask') return isA ? 'asked a question' : 'answering a question';
+    if (a.kind === 'talk') return 'talking ' + (a.turn || 1) + '/' + a.rounds;
+    return 'messaging';
+  }
+  return '';
+}
 function nodeHTML(s) {
   const h = s.ageS / 3600, size = h < 1 ? 64 : h < 24 ? 56 : 48;
   const reply = replies[s.id];
@@ -425,7 +450,8 @@ function nodeHTML(s) {
   return bubble + (s.needsYou ? '<div class="badge" title="Waiting for you: a question or an approval">!</div>' : '') +
     Critters.critterSVG({ id: s.id, state: stateKey(s), size, style: critterStyle() }) +
     '<div class="t">' + esc(s.title) + '</div>' +
-    '<div class="s">' + esc(s.needsYou ? 'needs you' : s.state === 'offline' ? ago(s.ageS) : s.state === 'busy' ? 'busy' : where(s)) + '</div>';
+    (convoLine(s) ? '<div class="s convo">' + esc(convoLine(s)) + '</div>'
+      : '<div class="s">' + esc(s.needsYou ? 'needs you' : s.state === 'offline' ? ago(s.ageS) : s.state === 'busy' ? 'busy' : where(s)) + '</div>');
 }
 function makeNode(s) {
   const n = document.createElement('div');
@@ -454,7 +480,10 @@ function render() {
     const groups = {};
     for (const s of list) (groups[s.group || base(s.startCwd) || s.project] ||= []).push(s);
     g.innerHTML = '';
-    const names = Object.keys(groups).sort((a, b) => (byGroup(b) - byGroup(a)) || a.localeCompare(b));
+    // your own groups first, then the rooms that need attention or are most active
+    const urgency = (n) => Math.min(...groups[n].map(s => rank[bucket(s)]));
+    const recent = (n) => Math.min(...groups[n].map(s => s.ageS));
+    const names = Object.keys(groups).sort((a, b) => (byGroup(b) - byGroup(a)) || (urgency(a) - urgency(b)) || (recent(a) - recent(b)) || a.localeCompare(b));
     for (const name of names) {
       const sec = document.createElement('div'); sec.className = 'group';
       sec.innerHTML = '<h2>' + esc(name) + ' <span>' + groups[name].length + (groups[name].length === 1 ? ' agent' : ' agents') + '</span></h2>';

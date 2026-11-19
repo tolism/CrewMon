@@ -9,7 +9,7 @@ See every agent at a glance, know what each one is doing, and talk to them, all 
 When you run several Claude Code chats at once, it gets hard to keep track of which one is working on what, which
 are still running, and which you left days ago. CrewMon turns them into a small crew of critters on one map.
 
-<p align="center"><img src="docs/styles.png" width="360" alt="The three critter styles (Bot, Blob, Bug) in the four state colours"></p>
+<p align="center"><img src="docs/screenshot.png" width="900" alt="CrewMon in VS Code: agents grouped by project on the Night city scene, one handing over to another, with the selected agent's card and message bar"></p>
 
 ## Features
 
@@ -28,8 +28,11 @@ are still running, and which you left days ago. CrewMon turns them into a small 
   it from the Claude app on your phone.
 - **✏️ Organise**: rename agents, put them in groups, arrange them freely, delete old ones (to a trash you can
   restore from).
-- **🎨 Make it yours**: pick the critter (🤖) and the background (🎨: Meadow, Starfield, Blueprint, Dots, Plain)
-  in the top bar.
+- **🎨 Make it yours**: in **View**, pick the critter (Bot, Blob or Bug) and the scene (Night city, Space station,
+  Meadow, Starfield, Blueprint, Dots, Plain).
+
+<p align="center"><img src="docs/styles.png" width="330" alt="The three critter styles (Bot, Blob, Bug) in the four state colours">
+&nbsp;&nbsp;<img src="docs/screenshot-meadow.png" width="420" alt="The same crew on the Meadow scene"></p>
 
 ## Install
 
@@ -184,6 +187,7 @@ keeper/keeper       the keeper (Python; state, log and trash in ~/.claude/keeper
 messenger/          the messenger add-on (runs in the background session)
 build_vsix.py       builds dist/crewmon-<version>.vsix
 make_icon.py        draws media/icon.png (needs Pillow)
+tools/screenshot/   the README screenshots: made-up example agents on the real map page, taken with headless Chromium
 tools/gallery.js    draws the preview sheets: node tools/gallery.js bot > docs/critters.svg, … styles > docs/styles.svg
 ```
 Edit, run `python3 build_vsix.py`, install the new `.vsix`, and reload the window.
