@@ -34,6 +34,11 @@ module.exports = {
              'a1f3c9d2-1': { status: 'active', holder: 'vscode', onMachine: false, managed: true } }, trash: [] },
   chips: ['Status?', 'Continue', 'Summarise where you are in 5 lines', 'Stop after this step', 'Commit your work', 'What do you need from me?'],
   replies: { 'd84b21c6-4': 'Refund endpoint done, 41 tests pass; webhooks next.' },
+  activity: [
+    { at: now - 60e3, rid: 'r2', kind: 'reply', convo: 'message', who: 'Payments API v2', text: 'Refund endpoint done, 41 tests pass; webhooks next.' },
+    { at: now - 95e3, rid: 'r2', kind: 'sent', convo: 'message', who: 'Payments API v2', text: 'Status?' },
+    { at: now - 240e3, rid: 'demo', kind: 'sent', convo: 'handover', who: 'Checkout flow redesign', text: 'Please write a hand-over note for another agent ("Design tokens update") who will continue part of your work. Save it as Markdown to ~/.claude/crewmon/handovers/... Include: the goal; what is done; key decisions and why; where things are; open problems; and the exact next steps.' },
+  ],
   messenger: true, messengerStatus: 'on', critter: 'bot',
-  active: [{ rid: 'demo', kind: 'handover', a: 'a1f3c9d2-1', b: 'c3a9f7e5-3', waiting: 'c3a9f7e5-3', turn: 0, rounds: 0 }],
+  active: [{ rid: 'demo', kind: 'handover', a: 'a1f3c9d2-1', b: 'c3a9f7e5-3', waiting: 'a1f3c9d2-1', step: 'note', turn: 0, rounds: 0, sentAt: now - 240e3, aTitle: 'Checkout flow redesign', bTitle: 'Design tokens update', waitingTitle: 'Checkout flow redesign', file: '' }],
 };

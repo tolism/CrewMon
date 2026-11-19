@@ -49,6 +49,8 @@ CAP = 10                  # chats held by keeper at once
 QUICK_EXIT_S = 60         # a copy that dies faster than this counts as a failed start
 MAX_ATTEMPTS = 3
 HANDBACK_KILL_S = 20      # force-stop a copy this long after /exit
+IDLE_S = 20               # a copy is idle when its chat file has not changed for this long
+HANDBACK_WAIT_S = 90      # wait at most this long for a busy copy before handing back anyway
 RECENT_S = 2 * 86400      # after a keeper restart, only pick up chats active in the last 2 days
 LOOP_SESSION = "keeper"
 
@@ -258,7 +260,17 @@ def tick(s, first=False):
             c.update(cwd=info["cwd"], mode=info["mode"], last_vscode=now)
             if c.get("holder") != "vscode":
                 if c.get("holder") == "keeper" and tname(cid) in live and not c.get("stopping"):
-                    stop_copy(s, cid, "reopened in VS Code")
+                    # do not cut a turn short: wait until the copy has been quiet for IDLE_S (at most HANDBACK_WAIT_S)
+                    p = transcript(cid)
+                    quiet = (now - os.path.getmtime(p)) if p else 999
+                    waited = now - c.setdefault("handback_since", now)
+                    if quiet < IDLE_S and waited < HANDBACK_WAIT_S:
+                        if not c.get("handback_logged"):
+                            log(f"{cid[:8]} reopened in VS Code; waiting for the machine copy to finish its turn")
+                            c["handback_logged"] = True
+                    else:
+                        c.pop("handback_since", None); c.pop("handback_logged", None)
+                        stop_copy(s, cid, "reopened in VS Code" + (" (waited for its turn to end)" if waited >= 1 else ""))
                 if tname(cid) not in live:
                     log(f"{cid[:8]} held by VS Code")
                     c.update(holder="vscode", status="active", stopping=None, attempts=0)

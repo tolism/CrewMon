@@ -99,8 +99,10 @@ them.
 ### Drag and drop
 - **Onto another critter** (or use **Hand over…** / **Ask…** in the agent card, or the right-click menu, and pick
   the other agent from a list):
-  - **Hand over to it**: A writes a hand-over note (goal, what's done, decisions, where things are, open problems,
-    next steps); then B is told to read it and continue. Notes are kept in `~/.claude/crewmon/handovers/`.
+  - **Hand over to it**: first a preview window shows **both instructions, editable**, with an optional *What should be
+    handed over?* field. A then writes a hand-over note (goal, what's done, decisions, where things are, open problems,
+    next steps). With *Let me read the note before it continues* (on by default), you get **Read the note** and
+    **Send to B** before B is told anything. Notes are kept in `~/.claude/crewmon/handovers/`.
   - **Ask it a question**: B answers; the answer goes to you and to A.
   - **Let them talk about…**: A and B discuss a topic for 1–4 turns each, then A sends you a summary.
 - **Onto the dock**: 🛟 *Keep alive* · 🗑 *Trash* · 📁 a group · *＋ New group* · *↩ No group*.
@@ -123,6 +125,10 @@ by itself. Each message is a normal turn for the agent that receives it.
 **Turn it on:** click **start** next to *messenger* in the top bar. The first time, Claude asks whether to trust the
 messenger's folder (`~/.claude/crewmon/messenger`). Run `tmux attach -t crewmon-messenger`, choose
 *Yes, I trust this folder*, then press `Ctrl+b` `d` to leave it running. It shows **● messenger on** when ready.
+
+**Activity** (top bar) lists every conversation in progress, with **Retry** and **Cancel**, and every message and
+reply (click one for the full text). If an agent restarts before it answers (a VS Code reload, the keeper handing it
+back), CrewMon sends its request again by itself.
 
 **Look inside:** `tmux attach -t crewmon-messenger` shows its screen. `~/.claude/crewmon/messenger/inbox.jsonl` lists
 what was delivered and every reply (`tail -f` it to watch live).

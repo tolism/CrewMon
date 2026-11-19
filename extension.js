@@ -69,6 +69,28 @@ function queue(job) {
   return rid;
 }
 let inboxSeen = Date.now();
+let noteSeen = Date.now();
+function openNote(file) {
+  if (file && fs.existsSync(file)) vscode.window.showTextDocument(vscode.Uri.file(file));
+  else vscode.window.showWarningMessage('CrewMon: the note is not there yet.');
+}
+// A request is lost when its agent restarts before answering (VS Code reload, keeper hand-back). Watch the process
+// running the agent each conversation waits for; if it changes and no reply came, send the last request again, once per change.
+const watchPid = {};   // rid -> pid seen
+function autoResend(active) {
+  const run = runningSessions();
+  for (const a of active) {
+    if (!a.waiting) continue;
+    const pids = (run[a.waiting] || []).map(p => p.pid).sort().join(',');
+    if (!pids) continue;                                  // asleep: it gets it when resent after waking (Retry)
+    if (watchPid[a.rid] === undefined) { watchPid[a.rid] = pids; continue; }
+    if (watchPid[a.rid] !== pids) {
+      watchPid[a.rid] = pids;
+      queue({ kind: 'resend', rid: a.rid });
+      vscode.window.setStatusBarMessage(`CrewMon: "${a.waitingTitle}" restarted; its request was sent again`, 6000);
+    }
+  }
+}
 let lastSessions = [];
 function readInbox() {
   const replies = {}, now = Date.now();
@@ -87,7 +109,24 @@ function readInbox() {
   if (lines.length) inboxSeen = Math.max(inboxSeen, lines[lines.length - 1].at);
   let active = [];
   try { active = JSON.parse(fs.readFileSync(path.join(MSG_DIR, 'active.json'), 'utf8')); } catch (_) { /* none */ }
-  return { replies, active };
+  // the Activity log: what CrewMon asked for (outbox) and what happened (inbox), newest first
+  let out = [];
+  try { out = fs.readFileSync(path.join(MSG_DIR, 'outbox.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch (_) { /* none */ }
+  const title = (id) => { const s = lastSessions.find(y => y.id === id); return s ? s.title : (id ? id.slice(0, 8) : ''); };
+  const activity = lines.filter(x => ['sent', 'resent', 'reply', 'error', 'done', 'cancelled', 'note-ready'].includes(x.kind)).map(x => {
+    const req = out.find(o => o.rid === x.rid) || {};
+    return { at: x.at, rid: x.rid || '', kind: x.kind, convo: req.kind || '', who: title(x.session), text: (x.text || '').slice(0, 4000) };
+  }).reverse().slice(0, 80);
+  for (const a of active) { a.aTitle = a.aTitle || title(a.a); a.bTitle = a.bTitle || title(a.b); a.waitingTitle = title(a.waiting); }
+  // notes waiting for your check
+  for (const x of lines) if (x.kind === 'note-ready' && x.at > noteSeen) {
+    noteSeen = x.at;
+    const a = active.find(y => y.rid === x.rid);
+    vscode.window.showInformationMessage(`CrewMon: the hand-over note from "${title(x.session)}" is ready.`, 'Read the note', 'Send to ' + (a ? a.bTitle.slice(0, 24) : 'B'), 'Cancel hand-over')
+      .then(p => { if (!p) return; if (p === 'Read the note') openNote(x.text); else if (p.startsWith('Send')) queue({ kind: 'approve', rid: x.rid }); else queue({ kind: 'cancel', rid: x.rid }); setTimeout(push, 1500); });
+  }
+  autoResend(active);
+  return { replies, active, activity };
 }
 
 // Send a message. Without the messenger: open the chat with the text typed in (you press Enter); several -> one after another.
@@ -130,12 +169,14 @@ async function setGroup(m) {
 async function handover(m) {
   fs.mkdirSync(HANDOVERS, { recursive: true });
   const file = path.join(HANDOVERS, `${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '')}-${m.from.slice(0, 8)}-to-${m.to.slice(0, 8)}.md`);
+  const fillT = (t) => (t || '').replace(/\{NOTE\}/g, file).replace(/\{A\}/g, m.fromTitle).replace(/\{B\}/g, m.toTitle);
   if ((await messengerStatus()) === 'on') {
-    queue({ kind: 'handover', from: m.from, to: m.to, fromTitle: m.fromTitle, toTitle: m.toTitle, file });
+    queue({ kind: 'handover', from: m.from, to: m.to, fromTitle: m.fromTitle, toTitle: m.toTitle, file,
+      textA: m.textA || '', textB: m.textB || '', approve: !!m.approve });
     vscode.window.showInformationMessage(`CrewMon: hand-over started: "${m.fromTitle}" writes the note, then "${m.toTitle}" continues.`);
     return;
   }
-  const ask = `Please write a hand-over note for another agent ("${m.toTitle}") who will continue part of your work. ` +
+  const ask = m.textA ? fillT(m.textA) : `Please write a hand-over note for another agent ("${m.toTitle}") who will continue part of your work. ` +
     `Save it as Markdown to ${file}. Include: the goal; what is done; key decisions and why; where things are (files, commands, ` +
     `data); open problems; and the exact next steps. Reply "hand-over ready" when it is saved.`;
   await openChat(m.from, ask);
@@ -147,7 +188,7 @@ async function handover(m) {
       const pick = await vscode.window.showInformationMessage(`CrewMon: the hand-over note from "${m.fromTitle}" is ready.`, `Open "${m.toTitle.slice(0, 30)}" with it`, 'Show the note');
       if (pick === 'Show the note') { vscode.window.showTextDocument(vscode.Uri.file(file)); }
       else if (pick) {
-        await openChat(m.to, `Read the hand-over note at ${file} from the agent "${m.fromTitle}" and continue from it. ` +
+        await openChat(m.to, m.textB ? fillT(m.textB) : `Read the hand-over note at ${file} from the agent "${m.fromTitle}" and continue from it. ` +
           `First confirm in 2-3 lines what you are taking over and what you will do next.`);
       }
     } else if (Date.now() - started > 3 * 3600e3) clearInterval(timer);
@@ -268,6 +309,7 @@ async function push() {
   const ib = readInbox();
   data.replies = ib.replies;
   data.active = ib.active;
+  data.activity = ib.activity;
   const slim = Object.assign({}, data, { sessions: (data.sessions || []).map(s => Object.assign({}, s, { summary: undefined })) });
   if (panel) panel.webview.postMessage({ type: 'data', data: slim });
 }
@@ -348,6 +390,8 @@ function open(context) {
       queue({ kind: 'talk', a: m.from, b: m.to, aTitle: m.fromTitle, bTitle: m.toTitle, text: topic.trim(), rounds: Number(r) });
       vscode.window.showInformationMessage('CrewMon: discussion started; replies appear over the critters and A sends a summary at the end.');
     }
+    else if (m.type === 'convo') { queue({ kind: m.action, rid: m.rid }); setTimeout(push, 1500); }
+    else if (m.type === 'opennote') openNote(m.file);
     else if (m.type === 'messenger') { if (m.on) await startMessenger(extRoot); else stopMessenger(); setTimeout(push, 1500); }
     else if (m.type === 'copy') { await vscode.env.clipboard.writeText(m.text); vscode.window.setStatusBarMessage('Copied ' + m.text, 2000); }
   });

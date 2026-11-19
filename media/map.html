@@ -58,6 +58,28 @@
   .node .t { width: 100%; text-align: center; font-size: 12px; line-height: 1.25; max-height: 3.75em; overflow: hidden; margin-top: 4px; overflow-wrap: anywhere; }
   .node .s { color: var(--muted); font-size: 11px; margin-top: 2px; }
   #main .node .s.convo { color: var(--busy); font-weight: 600; }
+  .dlg { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 45; width: min(640px, 92vw); max-height: 90vh; overflow: auto;
+    background: var(--vscode-editorWidget-background, var(--card)); border: 1px solid var(--border); border-radius: var(--r3); box-shadow: var(--raise);
+    padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .dlg h3 { margin: 0; font-size: 14px; }
+  .dlg .f { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--muted); }
+  .dlg .f span { opacity: .8; }
+  .dlg textarea, .dlg input[type=text] { font: inherit; font-size: 12.5px; color: var(--inputfg); background: var(--input);
+    border: 1px solid var(--vscode-input-border, var(--border)); border-radius: var(--r2); padding: 7px 9px; resize: vertical; }
+  .dlg .chk { display: flex; gap: 8px; align-items: center; font-size: 12.5px; }
+  .dlg .bar { display: flex; justify-content: flex-end; gap: 8px; }
+  .pop.actpop { display: block; width: min(560px, 92vw); max-height: 70vh; overflow: auto; grid-template-columns: none; padding: 12px 14px; }
+  .actpop h4 { margin: 0 0 6px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .actpop .conv { border: 1px solid var(--room-line); border-radius: var(--r2); padding: 8px 10px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .actpop .conv .row2 { display: flex; gap: 6px; flex-wrap: wrap; }
+  .actpop .ev { padding: 6px 2px; border-top: 1px solid var(--room-line); font-size: 12px; cursor: pointer; }
+  .actpop .ev .t { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 6px; }
+  .actpop .ev .body { white-space: pre-wrap; margin-top: 4px; display: none; color: var(--fg); }
+  .actpop .ev.open .body { display: block; }
+  .actpop .ev .sum { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .actpop .ev.open .sum { display: none; }
+  .cstrip { margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--busy); }
+  .cstrip b { font-weight: 600; }
   #arrowpills { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 5; pointer-events: none; }
   .arrowpill { position: absolute; transform: translateX(-50%); white-space: nowrap; font-size: 11px; font-weight: 600; color: #fff;
     background: var(--busy); border-radius: 999px; padding: 1px 8px; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
@@ -251,6 +273,7 @@
   <span class="spacer"></span>
   <span id="keeper" class="pill" title="The keeper keeps chats running on the machine when VS Code closes them"></span>
   <span id="messenger" class="pill" title="The messenger delivers messages directly and brings the replies back"></span>
+  <button id="actbtn" class="ghost" aria-haspopup="true" aria-expanded="false">Activity</button>
   <button id="viewbtn" class="ghost" aria-haspopup="true" aria-expanded="false">View</button>
   <span id="count" hidden></span>
 </header>
@@ -273,7 +296,21 @@
   </div>
   <div class="msg"><input id="pmsg" type="text" placeholder="Message this agent…  (Enter)" aria-label="Message"><button id="psend">Send</button></div>
   <div id="chips"></div>
+  <div class="cstrip" id="pconvo" hidden></div>
   <div class="note" id="pnote"></div>
+</div>
+<div id="act" class="pop actpop" hidden></div>
+<div id="hdlg" class="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="hdlgt">
+  <h3 id="hdlgt"></h3>
+  <label class="f">What should be handed over? <span>(optional, e.g. "only the test fixes")</span>
+    <input id="hfocus" type="text" placeholder="everything this agent is working on"></label>
+  <label class="f">Instructions for the agent handing over
+    <textarea id="htextA" rows="5"></textarea></label>
+  <label class="f">Then, for the agent taking over
+    <textarea id="htextB" rows="3"></textarea></label>
+  <label class="chk"><input id="happrove" type="checkbox" checked> Let me read the note before it continues</label>
+  <div class="note">{NOTE} becomes the note's file, {A} and {B} the two agents' names.</div>
+  <div class="bar"><button class="ghost" id="hcancel">Cancel</button><button id="hstart">Start hand-over</button></div>
 </div>
 <div id="card"></div>
 <div id="menu" class="menu"></div>
@@ -319,7 +356,7 @@ const base = (p) => (p || '').split('/').filter(Boolean).pop() || '';
 const tilde = (p) => (p || '').replace(/^\/home\/[^/]+/, '~');
 const post = (m) => vscode.postMessage(m);
 
-let sessions = [], keeper = null, chips = [], replies = {}, messengerOn = false, messengerStatus = 'off', active = [];
+let sessions = [], keeper = null, chips = [], replies = {}, messengerOn = false, messengerStatus = 'off', active = [], activity = [];
 const saved = vscode.getState() || {};
 let layout = saved.layout || 'grouped';
 let bg = saved.bgv === 2 && saved.bg ? saved.bg : 'city';   // the new scenes: start on Night city once
@@ -435,7 +472,7 @@ function convoLine(s) {   // this agent's part in a conversation in progress, if
   for (const a of active) {
     const isA = a.a === s.id, isB = a.b === s.id;
     if (!isA && !isB) continue;
-    if (a.kind === 'handover') return isA ? 'handing over' : 'taking over';
+    if (a.kind === 'handover') return a.step === 'review' ? 'note ready: check it' : isA ? 'handing over' : 'taking over';
     if (a.kind === 'ask') return isA ? 'asked a question' : 'answering a question';
     if (a.kind === 'talk') return 'talking ' + (a.turn || 1) + '/' + a.rounds;
     return 'messaging';
@@ -579,6 +616,9 @@ function renderPanel() {
   } else {
     btn('x', 'Clear', 'Clear the selection (Esc)', clearSel);
   }
+  const conv = one ? active.find(x => x.a === one.id || x.b === one.id) : null;
+  $('pconvo').hidden = !conv;
+  if (conv) { $('pconvo').innerHTML = '<span>' + convoText(conv) + '</span>' + convoActions(conv); wireConvoButtons($('pconvo')); }
   $('pmsg').placeholder = one ? 'Message ' + one.title.slice(0, 40) + '…  (Enter)' : 'Message all ' + list.length + ' agents…  (Enter)';
   $('psend').innerHTML = ic('send') + '<span>' + (one ? 'Send' : 'Send to all') + '</span>';
   $('pnote').textContent = messengerOn ? 'Sent directly by the CrewMon messenger; replies appear over the critter.'
@@ -714,6 +754,72 @@ function showMenu(s, ev) {
     ['Delete chat (to trash)…', () => post({ type: 'keeper', action: 'delete', id: s.id, title: s.title }), inVS ? 'Close it in VS Code first' : false],
   ], ev);
 }
+// ---------------- hand-over preview: see and edit the instructions before anything is sent ----------------
+const HA = 'Please write a hand-over note for another agent ("{B}") who will continue part of your work. Save it as Markdown to {NOTE}. ' +
+  'Include: the goal; what is done; key decisions and why; where things are (files, commands, data); open problems; and the exact next steps. ' +
+  'When it is saved, reply "hand-over ready".';
+const HB = 'Read the hand-over note at {NOTE} from the agent "{A}" and continue from it. First reply with 2-3 lines on what you are taking over and what you will do next.';
+let hpair = null;
+function openHandover(a, b) {
+  hpair = { a, b };
+  $('hdlgt').textContent = 'Hand over: ' + a.title + '  →  ' + b.title;
+  $('hfocus').value = ''; $('htextA').value = HA; $('htextB').value = HB;
+  $('happrove').checked = true; $('happrove').parentElement.hidden = !messengerOn;
+  $('hdlg').hidden = false; $('hfocus').focus();
+}
+$('hcancel').onclick = () => { $('hdlg').hidden = true; };
+$('hstart').onclick = () => {
+  if (!hpair) return;
+  const focus = $('hfocus').value.trim();
+  let textA = $('htextA').value.trim(), textB = $('htextB').value.trim();
+  if (focus) { textA += ' Hand over only this part: ' + focus + '.'; textB += ' You are taking over: ' + focus + '.'; }
+  post({ type: 'handover', from: hpair.a.id, to: hpair.b.id, fromTitle: hpair.a.title, toTitle: hpair.b.title, textA, textB, approve: $('happrove').checked });
+  $('hdlg').hidden = true;
+};
+$('hdlg').addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('hdlg').hidden = true; } e.stopPropagation(); });
+
+// ---------------- Activity: conversations in progress + every message and reply ----------------
+function convoActions(a) {
+  const btns = [['Retry', 'retry', 'Send its last request again (e.g. after the agent restarted)'], ['Cancel', 'cancel', 'End this conversation']];
+  if (a.kind === 'handover' && a.step === 'review') btns.unshift(['Read the note', 'note', ''], ['Send to ' + (a.bTitle || 'B').slice(0, 24), 'approve', 'Tell the other agent to continue from the note']);
+  return btns.map(([l, act, t]) => '<button class="ghost" data-rid="' + esc(a.rid) + '" data-act="' + act + '" data-file="' + esc(a.file || '') + '" title="' + esc(t) + '">' + esc(l) + '</button>').join('');
+}
+function wireConvoButtons(root) {
+  root.querySelectorAll('button[data-act]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    if (b.dataset.act === 'note') post({ type: 'opennote', file: b.dataset.file });
+    else post({ type: 'convo', action: b.dataset.act === 'retry' ? 'resend' : b.dataset.act, rid: b.dataset.rid });
+  });
+}
+function convoText(a) {
+  const k = { handover: 'Hand-over', ask: 'Question', talk: 'Discussion', message: 'Message' }[a.kind] || a.kind;
+  const step = a.kind === 'handover' ? (a.step === 'note' ? 'writing the note' : a.step === 'review' ? 'note ready for your check' : 'taking over') : a.kind === 'talk' ? 'turn ' + a.turn + '/' + a.rounds : '';
+  const since = a.sentAt ? ' · sent ' + ago(Math.round((Date.now() - a.sentAt) / 1000)) : '';
+  return '<b>' + esc(k) + '</b> ' + esc(a.aTitle || '') + (a.bTitle ? ' → ' + esc(a.bTitle) : '') + (step ? ' · ' + esc(step) : '') +
+    (a.waiting ? ' · waiting for ' + esc(a.waitingTitle || '') : '') + esc(since);
+}
+function renderActivity() {
+  const el = $('act');
+  const icon = { sent: 'send', resent: 'send', reply: 'reply', error: 'x', done: 'open', cancelled: 'x', 'note-ready': 'note' };
+  const verb = { sent: 'CrewMon → ', resent: 'sent again → ', reply: '', error: 'could not deliver to ', done: 'finished', cancelled: 'cancelled', 'note-ready': 'note ready from ' };
+  el.innerHTML = '<h4>In progress</h4>' + (active.length ? active.map(a => '<div class="conv"><div>' + convoText(a) + '</div><div class="row2">' + convoActions(a) + '</div></div>').join('') : '<div class="note" style="margin-bottom:8px">Nothing in progress.</div>') +
+    '<h4 style="margin-top:10px">Messages</h4>' + (activity.length ? activity.map(x =>
+      '<div class="ev"><span class="t">' + new Date(x.at).toTimeString().slice(0, 5) + '</span>' + ic(icon[x.kind] || 'reply') + ' ' +
+      esc((verb[x.kind] ?? '') + (x.kind === 'done' || x.kind === 'cancelled' ? '' : x.who) + (x.kind === 'reply' ? ' replied' : '')) +
+      (x.text ? '<div class="sum">' + esc(x.text) + '</div><div class="body">' + esc(x.text) + '</div>' : '') + '</div>').join('') : '<div class="note">No messages yet.</div>');
+  el.querySelectorAll('.ev').forEach(d => d.onclick = () => d.classList.toggle('open'));
+  wireConvoButtons(el);
+}
+function toggleAct(show) {
+  const v = $('act'), b = $('actbtn');
+  const on = show === undefined ? v.hidden : show;
+  v.hidden = !on; b.setAttribute('aria-expanded', String(on));
+  if (on) { renderActivity(); const r = b.getBoundingClientRect(); v.style.top = (r.bottom + 6) + 'px'; v.style.left = Math.max(8, Math.min(r.right - v.offsetWidth, innerWidth - v.offsetWidth - 8)) + 'px'; }
+}
+$('actbtn').innerHTML = ic('reply') + '<span>Activity</span>';
+$('actbtn').onclick = (e) => { e.stopPropagation(); toggleView(false); toggleAct(); };
+document.addEventListener('pointerdown', (e) => { if (!$('act').hidden && !$('act').contains(e.target) && !$('actbtn').contains(e.target)) toggleAct(false); });
+
 function pickPartner(a, kind, ev) {
   const others = sessions.filter(s => s.id !== a.id).sort((x, y) => (rank[bucket(x)] - rank[bucket(y)]) || (x.ageS - y.ageS));
   const verb = { handover: 'Hand over to', ask: 'Ask', talk: 'Talk with' }[kind];
@@ -721,7 +827,7 @@ function pickPartner(a, kind, ev) {
   for (const b of others.slice(0, 25)) {
     const asleep = b.state === 'offline';
     items.push([b.title.slice(0, 48) + '  ·  ' + (b.needsYou ? 'needs you' : asleep ? 'asleep' : b.state),
-      () => post({ type: kind, from: a.id, to: b.id, fromTitle: a.title, toTitle: b.title }),
+      () => kind === 'handover' ? openHandover(a, b) : post({ type: kind, from: a.id, to: b.id, fromTitle: a.title, toTitle: b.title }),
       asleep ? 'Asleep: double-click it first to wake it' : (kind !== 'handover' && !messengerOn ? 'Needs the messenger (top bar)' : false)]);
   }
   openMenu(items, ev);
@@ -731,7 +837,7 @@ function pairMenu(a, b, ev) {
   const needMsg = messengerOn ? false : 'Needs the messenger (top bar)';
   openMenu([
     [a.title.slice(0, 34) + '  →  ' + b.title.slice(0, 34), 'head'],
-    ['Hand over to it…  (A writes a note, B continues)', () => post({ type: 'handover', from: a.id, to: b.id, fromTitle: a.title, toTitle: b.title })],
+    ['Hand over to it…  (A writes a note, B continues)', () => openHandover(a, b)],
     ['Ask it a question…', () => post({ type: 'ask', from: a.id, to: b.id, fromTitle: a.title, toTitle: b.title }), needMsg],
     ['Let them talk about…', () => post({ type: 'talk', from: a.id, to: b.id, fromTitle: a.title, toTitle: b.title }), needMsg],
   ], ev);
@@ -744,7 +850,7 @@ document.addEventListener('keydown', (e) => {
   const list = shown(); const one = sel().length === 1 ? sel()[0] : null;
   if (e.key === '/') { e.preventDefault(); $('q').focus(); return; }
   if (e.key === '?') { $('help').style.display = $('help').style.display === 'block' ? 'none' : 'block'; return; }
-  if (e.key === 'Escape') { $('menu').style.display = 'none'; $('help').style.display = 'none'; toggleView(false); clearSel(); return; }
+  if (e.key === 'Escape') { $('menu').style.display = 'none'; $('help').style.display = 'none'; toggleView(false); toggleAct(false); clearSel(); return; }
   if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
     e.preventDefault();
     const nodes = [...document.querySelectorAll((layout === 'free' ? '#free' : '#groups') + ' .node')];
@@ -805,6 +911,7 @@ window.addEventListener('message', (e) => {
     if (m.data.critter && m.data.critter !== defaultStyle) { defaultStyle = m.data.critter; renderLegend(); }
     $('style').value = critterStyle();
     replies = m.data.replies || {}; messengerOn = !!m.data.messenger; messengerStatus = m.data.messengerStatus || 'off'; active = m.data.active || [];
+    activity = m.data.activity || []; if (!$('act').hidden) renderActivity();
     for (const id of [...selected]) if (!byId(id)) selected.delete(id);
     if (drag) return;   // do not redraw under the pointer while dragging
     try { renderKeeper(); renderMessenger(); render(); drawArrows(); }
