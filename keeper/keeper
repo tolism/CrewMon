@@ -1,0 +1,550 @@
+#!/usr/bin/env python3
+"""keeper - keep Claude Code chats reachable from the Claude app when VS Code closes them.
+
+When a chat that was open in VS Code stops running there (tab closed, VS Code closed),
+keeper resumes it on this machine in a tmux session with Remote Control on, so it stays
+usable from the Claude app. When the chat is reopened in VS Code, keeper stops its copy.
+
+Safety rules:
+  * keeper only starts/stops tmux sessions it created (named cc-<first 8 of id>);
+    it never signals VS Code's processes.
+  * it never starts a copy while a VS Code process for the same chat exists.
+  * mode "allowlist" (default): only chats added with `keeper watch <id>` are managed.
+    mode "all": every chat seen open in VS Code is managed.
+  * nothing is deleted except by `keeper delete` (moves to trash) and `keeper purge`.
+
+Commands:
+  keeper start | stop | status
+  keeper watch <id>       add a chat to the allowlist
+  keeper unwatch <id>     remove it
+  keeper mode allowlist|all
+  keeper hold <id>        put a chat on the machine now (must not be open in VS Code)
+  keeper end <id>         stop keeper's copy, keep the chat resumable
+  keeper delete <id>      stop it and move its files to trash (asks to confirm)
+  keeper restore <id>     move it back from trash
+  keeper purge            empty the trash for good (asks to confirm)
+  keeper run              the watch loop (used by `keeper start`)
+<id> may be the full session id or a unique prefix (8 characters are enough).
+"""
+import fcntl
+import glob
+import json
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import time
+
+HOME = os.path.expanduser("~")
+DIR = os.path.join(HOME, ".claude", "keeper")
+STATE = os.path.join(DIR, "state.json")
+LOG = os.path.join(DIR, "keeper.log")
+TRASH = os.path.join(DIR, "trash")
+LOCK = os.path.join(DIR, "run.lock")
+PROJECTS = os.path.join(HOME, ".claude", "projects")
+POLL_S = 5
+CAP = 10                  # chats held by keeper at once
+QUICK_EXIT_S = 60         # a copy that dies faster than this counts as a failed start
+MAX_ATTEMPTS = 3
+HANDBACK_KILL_S = 20      # force-stop a copy this long after /exit
+RECENT_S = 2 * 86400      # after a keeper restart, only pick up chats active in the last 2 days
+LOOP_SESSION = "keeper"
+
+
+# ---------- helpers ----------
+def log(msg):
+    os.makedirs(DIR, exist_ok=True)
+    line = time.strftime("%Y-%m-%d %H:%M:%S ") + msg
+    with open(LOG, "a") as f:
+        f.write(line + "\n")
+
+
+def load():
+    try:
+        with open(STATE) as f:
+            s = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        s = {}
+    s.setdefault("mode", "allowlist")
+    s.setdefault("allow", [])
+    s.setdefault("chats", {})
+    return s
+
+
+def save(s):
+    os.makedirs(DIR, exist_ok=True)
+    tmp = STATE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(s, f, indent=1)
+    os.replace(tmp, STATE)
+
+
+class state_lock:
+    """Serialises every read-modify-write of the state between the loop and the commands."""
+    def __enter__(self):
+        os.makedirs(DIR, exist_ok=True)
+        self.f = open(os.path.join(DIR, "state.lock"), "w")
+        fcntl.flock(self.f, fcntl.LOCK_EX)
+        return self
+
+    def __exit__(self, *exc):
+        fcntl.flock(self.f, fcntl.LOCK_UN)
+        self.f.close()
+
+
+def tmux(*args, check=False):
+    return subprocess.run(["tmux", *args], capture_output=True, text=True, check=check)
+
+
+def tmux_sessions():
+    r = tmux("list-sessions", "-F", "#S")
+    return set(r.stdout.split()) if r.returncode == 0 else set()
+
+
+def tname(cid):
+    return "cc-" + cid[:8]
+
+
+def claude_bin():
+    """Newest Claude binary shipped with the VS Code extension (same version and login as VS Code)."""
+    cands = glob.glob(os.path.join(HOME, ".vscode-server/extensions/anthropic.claude-code-*/resources/native-binary/claude"))
+    def ver(p):
+        m = re.search(r"claude-code-(\d+)\.(\d+)\.(\d+)", p)
+        return tuple(int(x) for x in m.groups()) if m else (0,)
+    cands = [c for c in cands if os.access(c, os.X_OK)]
+    if not cands:
+        raise SystemExit("keeper: no Claude binary found in ~/.vscode-server/extensions")
+    return max(cands, key=ver)
+
+
+def read_cmdline(pid):
+    try:
+        with open(f"/proc/{pid}/cmdline", "rb") as f:
+            return [a.decode(errors="replace") for a in f.read().split(b"\0") if a]
+    except OSError:
+        return []
+
+
+def ppid_of(pid):
+    try:
+        with open(f"/proc/{pid}/stat") as f:
+            return int(f.read().rsplit(")", 1)[1].split()[1])
+    except (OSError, ValueError, IndexError):
+        return 0
+
+
+def vscode_chats():
+    """{chat id: {cwd, mode}} for chats VS Code is running now.
+    A VS Code chat = a native-binary claude process in stream-json mode whose parent is VS Code's server."""
+    out = {}
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        a = read_cmdline(pid)
+        if not a or not a[0].endswith("native-binary/claude") or "stream-json" not in a:
+            continue
+        parent = " ".join(read_cmdline(ppid_of(pid)))
+        if ".vscode-server" not in parent:
+            continue  # e.g. a subagent started by a chat, not a chat
+        cid = mode = None
+        for x in a:
+            if x.startswith("--resume="):
+                cid = x.split("=", 1)[1]
+            elif x.startswith("--permission-mode="):
+                mode = x.split("=", 1)[1]
+        if not cid:
+            continue  # brand-new chat without --resume: not handled (yet)
+        try:
+            cwd = os.readlink(f"/proc/{pid}/cwd")
+        except OSError:
+            cwd = None
+        out[cid] = {"cwd": cwd, "mode": mode or "default", "pid": int(pid)}
+    return out
+
+
+def transcript(cid):
+    hits = glob.glob(os.path.join(PROJECTS, "*", cid + ".jsonl"))
+    return hits[0] if hits else None
+
+
+def title_of(cid):
+    p = transcript(cid)
+    if not p:
+        return ""
+    try:
+        with open(p, errors="replace") as f:
+            for i, line in enumerate(f):
+                if i > 400:
+                    break
+                try:
+                    r = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if r.get("type") in ("summary", "custom-title", "ai-title"):
+                    t = r.get("summary") or r.get("customTitle") or r.get("title")
+                    if t:
+                        return t[:50]
+                m = r.get("message") or {}
+                if r.get("type") == "user" and m.get("role") == "user":
+                    c = m.get("content")
+                    t = c if isinstance(c, str) else " ".join(x.get("text", "") for x in c if isinstance(x, dict))
+                    t = " ".join(t.split())
+                    if t and not t.startswith("<"):
+                        return t[:50]
+    except OSError:
+        pass
+    return ""
+
+
+def managed(s, cid):
+    return s["mode"] == "all" or cid in s["allow"]
+
+
+def resolve(s, prefix, need_known=False):
+    pool = set(s["chats"]) | set(s["allow"])
+    pool |= {os.path.basename(p)[:-6] for p in glob.glob(os.path.join(PROJECTS, "*", "*.jsonl"))}
+    hits = sorted(c for c in pool if c.startswith(prefix))
+    if len(hits) != 1:
+        raise SystemExit(f"keeper: '{prefix}' matches {len(hits)} chats" + (": " + ", ".join(hits[:5]) if hits else ""))
+    return hits[0]
+
+
+# ---------- actions ----------
+def start_copy(s, cid, why):
+    c = s["chats"][cid]
+    cwd = c.get("cwd") or HOME
+    if cid in vscode_chats():                      # hard rule, re-checked right before starting
+        log(f"{cid[:8]} not started: open in VS Code")
+        return False
+    if not transcript(cid):
+        log(f"{cid[:8]} not started: no transcript")
+        c["status"] = "failed"
+        return False
+    claude = claude_bin()
+    inner = " ".join(shlex.quote(x) for x in [claude, "--resume", cid, "--permission-mode", c.get("mode", "default"),
+                                              "--remote-control"])
+    # drop Claude variables inherited from whoever started tmux, so the copy is a clean top-level session
+    cmd = f'exec env $(env | grep -oE "^(CLAUDE[A-Z_]*)" | sed "s/^/-u /") {inner}'
+    r = tmux("new-session", "-d", "-s", tname(cid), "-c", cwd, "-x", "200", "-y", "50", cmd)
+    if r.returncode != 0:
+        log(f"{cid[:8]} tmux failed: {r.stderr.strip()}")
+        return False
+    c.update(holder="keeper", status="active", started=time.time(), stopping=None)
+    log(f"{cid[:8]} started on the machine ({why}) in {cwd} [{c.get('mode')}]")
+    return True
+
+
+def stop_copy(s, cid, why):
+    c = s["chats"].get(cid, {})
+    if tname(cid) not in tmux_sessions():
+        return
+    tmux("send-keys", "-t", tname(cid), "Escape")
+    time.sleep(0.3)
+    tmux("send-keys", "-t", tname(cid), "-l", "/exit")
+    tmux("send-keys", "-t", tname(cid), "Enter")
+    c["stopping"] = time.time()
+    log(f"{cid[:8]} stopping keeper copy ({why})")
+
+
+def tick(s, first=False):
+    vs = vscode_chats()
+    live = tmux_sessions()
+    now = time.time()
+    for cid, info in vs.items():
+        c = s["chats"].setdefault(cid, {})
+        if managed(s, cid) or c:
+            c.update(cwd=info["cwd"], mode=info["mode"], last_vscode=now)
+            if c.get("holder") != "vscode":
+                if c.get("holder") == "keeper" and tname(cid) in live and not c.get("stopping"):
+                    stop_copy(s, cid, "reopened in VS Code")
+                if tname(cid) not in live:
+                    log(f"{cid[:8]} held by VS Code")
+                    c.update(holder="vscode", status="active", stopping=None, attempts=0)
+            c.setdefault("title", title_of(cid))
+        else:
+            s["chats"].pop(cid, None)
+
+    held = sum(1 for c in s["chats"].values() if c.get("holder") == "keeper" and c.get("status") == "active")
+    for cid, c in list(s["chats"].items()):
+        if not managed(s, cid) or cid in vs:
+            # still force-stop a copy that ignored /exit after VS Code took over
+            if c.get("stopping") and now - c["stopping"] > HANDBACK_KILL_S and tname(cid) in live:
+                tmux("kill-session", "-t", tname(cid))
+                log(f"{cid[:8]} keeper copy force-stopped")
+            continue
+        h, st = c.get("holder"), c.get("status")
+        if st in ("ended", "deleted", "failed"):
+            continue
+        if h == "vscode":                                   # VS Code stopped running it
+            recent = now - c.get("last_vscode", 0) < RECENT_S
+            if first and not recent:
+                continue
+            if held >= CAP:
+                log(f"{cid[:8]} not started: cap {CAP} reached")
+                continue
+            if start_copy(s, cid, "closed in VS Code"):
+                held += 1
+        elif h == "keeper" and tname(cid) not in live:
+            if c.get("stopping"):
+                c.update(holder=None, status="ended", stopping=None)
+                log(f"{cid[:8]} keeper copy stopped")
+            elif first:                                     # e.g. after a reboot: bring it back
+                start_copy(s, cid, "restore after restart")
+            elif now - c.get("started", 0) < QUICK_EXIT_S:
+                c["attempts"] = c.get("attempts", 0) + 1
+                if c["attempts"] >= MAX_ATTEMPTS:
+                    c["status"] = "failed"
+                    log(f"{cid[:8]} failed {MAX_ATTEMPTS} times, giving up (see `tmux` / this log)")
+                else:
+                    start_copy(s, cid, f"retry {c['attempts']}")
+            else:
+                c.update(holder=None, status="ended")
+                log(f"{cid[:8]} ended from the app or the machine copy; not restarted")
+
+
+def run():
+    os.makedirs(DIR, exist_ok=True)
+    lk = open(LOCK, "w")
+    try:
+        fcntl.flock(lk, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise SystemExit("keeper: already running")
+    log(f"loop started (pid {os.getpid()})")
+    first = True
+    while True:
+        with state_lock():
+            s = load()
+            try:
+                tick(s, first)
+            except Exception as e:  # keep the loop alive, but record the problem
+                log(f"error: {e!r}")
+            save(s)
+        first = False
+        time.sleep(POLL_S)
+
+
+# ---------- commands ----------
+def cmd_start():
+    if LOOP_SESSION in tmux_sessions():
+        print("keeper is already running (tmux session 'keeper')")
+        return
+    me = os.path.abspath(__file__)
+    r = tmux("new-session", "-d", "-s", LOOP_SESSION,
+             f'exec env $(env | grep -oE "^(CLAUDE[A-Z_]*)" | sed "s/^/-u /") python3 {shlex.quote(me)} run')
+    print("keeper started" if r.returncode == 0 else f"failed: {r.stderr.strip()}")
+
+
+def cmd_stop():
+    if LOOP_SESSION in tmux_sessions():
+        tmux("kill-session", "-t", LOOP_SESSION)
+        print("keeper loop stopped (chats it holds keep running; `keeper status` lists them)")
+    else:
+        print("keeper is not running")
+
+
+def cmd_status():
+    s = load()
+    vs = vscode_chats()
+    live = tmux_sessions()
+    print(f"loop: {'running' if LOOP_SESSION in live else 'STOPPED'}   mode: {s['mode']}   "
+          f"allowlist: {len(s['allow'])}   log: {LOG}")
+    rows = []
+    for cid, c in s["chats"].items():
+        where = "VS Code" if cid in vs else ("machine (tmux " + tname(cid) + ")" if tname(cid) in live else "-")
+        rows.append((cid[:8], where, c.get("status", "?"), "yes" if managed(s, cid) else "no",
+                     os.path.basename(c.get("cwd") or ""), c.get("title", "")))
+    if not rows:
+        print("no chats tracked yet")
+        return
+    print(f"{'id':8}  {'running in':22}  {'status':8}  {'managed':7}  {'folder':26}  title")
+    for r in sorted(rows, key=lambda r: r[1]):
+        print(f"{r[0]:8}  {r[1]:22}  {r[2]:8}  {r[3]:7}  {r[4][:26]:26}  {r[5]}")
+
+
+def cmd_status_json():
+    """Machine-readable status for Agent Map."""
+    s = load()
+    live = tmux_sessions()
+    print(json.dumps({
+        "running": LOOP_SESSION in live, "mode": s["mode"], "allow": s["allow"],
+        "chats": {cid: {"status": c.get("status"), "holder": c.get("holder"),
+                        "onMachine": tname(cid) in live, "managed": managed(s, cid)}
+                  for cid, c in s["chats"].items()},
+        "trash": sorted(os.path.basename(d) for d in glob.glob(os.path.join(TRASH, "*"))),
+    }))
+
+
+def cmd_watch(prefix, on=True):
+    with state_lock():
+        s = load()
+        cid = resolve(s, prefix)
+        if on and cid not in s["allow"]:
+            s["allow"].append(cid)
+        if not on and cid in s["allow"]:
+            s["allow"].remove(cid)
+        save(s)
+    print(("watching " if on else "no longer watching ") + cid)
+
+
+def cmd_mode(m):
+    if m not in ("allowlist", "all"):
+        raise SystemExit("mode must be allowlist or all")
+    with state_lock():
+        s = load()
+        s["mode"] = m
+        save(s)
+    print("mode:", m)
+
+
+def cmd_hold(prefix):
+    with state_lock():
+        _hold(prefix)
+
+
+def _hold(prefix):
+    s = load()
+    cid = resolve(s, prefix)
+    if cid in vscode_chats():
+        raise SystemExit("keeper: this chat is open in VS Code; close its tab first")
+    if tname(cid) in tmux_sessions():
+        raise SystemExit(f"keeper: already on the machine (tmux attach -t {tname(cid)})")
+    p = transcript(cid)
+    cwd = None
+    if p:
+        with open(p, errors="replace") as f:
+            for line in f:
+                try:
+                    cwd = json.loads(line).get("cwd")
+                except json.JSONDecodeError:
+                    continue
+                if cwd:
+                    break
+    c = s["chats"].setdefault(cid, {})
+    c.setdefault("cwd", cwd)
+    c.setdefault("mode", "default")
+    c["title"] = c.get("title") or title_of(cid)
+    if cid not in s["allow"]:
+        s["allow"].append(cid)
+    c.update(attempts=0, status="active")
+    ok = start_copy(s, cid, "keeper hold")
+    save(s)
+    print(f"on the machine: tmux attach -t {tname(cid)}" if ok else "could not start, see " + LOG)
+
+
+def cmd_end(prefix):
+    with state_lock():
+        s = load()
+        cid = resolve(s, prefix)
+        c = s["chats"].setdefault(cid, {})
+        c.update(status="ended")           # mark first, so the loop never restarts it
+        stop_copy(s, cid, "keeper end")
+        save(s)
+    print(f"ended {cid[:8]}; still resumable from VS Code")
+
+
+def confirm(word, what):
+    a = input(f"{what}\nType {word} to confirm: ").strip()
+    if a != word:
+        raise SystemExit("cancelled")
+
+
+def cmd_delete(prefix):
+    s = load()
+    cid = resolve(s, prefix)
+    if cid in vscode_chats():
+        raise SystemExit("keeper: this chat is open in VS Code; close it there first")
+    if cid == os.environ.get("CLAUDE_CODE_SESSION_ID"):
+        raise SystemExit("keeper: refusing to delete the chat this command runs in")
+    p = transcript(cid)
+    if not p:
+        raise SystemExit("keeper: no files found for " + cid)
+    side = p[:-6]  # <id>/ folder next to the transcript (tool outputs, subagents)
+    confirm(cid[:8], f"Delete chat {cid} ({title_of(cid)!r})?\nFiles go to {TRASH} (keeper restore brings them back).")
+    with state_lock():
+        s = load()
+        s["chats"].setdefault(cid, {})["status"] = "deleted"   # mark first, so the loop never restarts it
+        if cid in s["allow"]:
+            s["allow"].remove(cid)
+        save(s)
+        stop_copy(s, cid, "keeper delete")
+        for _ in range(20):                                     # wait for the copy to exit before moving files
+            if tname(cid) not in tmux_sessions():
+                break
+            time.sleep(0.5)
+        if tname(cid) in tmux_sessions():
+            tmux("kill-session", "-t", tname(cid))
+            time.sleep(1)
+        if cid in vscode_chats():
+            raise SystemExit("keeper: the chat was reopened in VS Code meanwhile; not moved (status: deleted)")
+        dest = os.path.join(TRASH, time.strftime("%Y%m%d-%H%M%S-") + cid)
+        os.makedirs(dest)
+        moved = []
+        for src in [p] + ([side] if os.path.isdir(side) else []):
+            shutil.move(src, os.path.join(dest, os.path.basename(src)))
+            moved.append(src)
+        with open(os.path.join(dest, "origin.json"), "w") as f:
+            json.dump({"id": cid, "moved": moved, "deleted_at": time.time()}, f, indent=1)
+        save(s)
+    log(f"{cid[:8]} deleted to trash")
+    print(f"moved to {dest}\nAlso delete or archive it in the Claude app (Code > the session > menu).")
+
+
+def cmd_restore(prefix):
+    hits = sorted(d for d in glob.glob(os.path.join(TRASH, "*")) if os.path.basename(d)[16:].startswith(prefix))
+    if len({os.path.basename(d)[16:] for d in hits}) != 1:
+        raise SystemExit(f"keeper: '{prefix}' matches {len(hits)} chats in trash")
+    if len(hits) > 1:   # keep the copy with the most conversation in it
+        def size(d):
+            return sum(os.path.getsize(f) for f in glob.glob(os.path.join(d, "*.jsonl")))
+        hits = [max(hits, key=size)]
+        print(f"several trashed copies of this chat; restoring the largest ({os.path.basename(hits[0])[:15]})")
+    with open(os.path.join(hits[0], "origin.json")) as f:
+        o = json.load(f)
+    for src in o["moved"]:
+        if os.path.exists(src):
+            raise SystemExit("keeper: refusing to overwrite " + src)
+    for src in o["moved"]:
+        shutil.move(os.path.join(hits[0], os.path.basename(src)), src)
+    shutil.rmtree(hits[0])
+    with state_lock():
+        s = load()
+        s["chats"].setdefault(o["id"], {})["status"] = "ended"
+        save(s)
+    log(f"{o['id'][:8]} restored from trash")
+    print("restored", o["id"])
+
+
+def cmd_purge():
+    items = sorted(glob.glob(os.path.join(TRASH, "*")))
+    if not items:
+        print("trash is empty")
+        return
+    for d in items:
+        print(" ", os.path.basename(d))
+    confirm("purge", f"Permanently delete these {len(items)} chats? This cannot be undone.")
+    for d in items:
+        shutil.rmtree(d)
+    log(f"purged {len(items)} chats from trash")
+    print("trash emptied")
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help", "help"):
+        print(__doc__)
+        return
+    c, rest = argv[0], argv[1:]
+    table = {"start": cmd_start, "stop": cmd_stop, "status": cmd_status, "run": run, "purge": cmd_purge}
+    if c == "status" and rest == ["--json"]:
+        return cmd_status_json()
+    if c in table:
+        return table[c]()
+    if c in ("watch", "unwatch", "mode", "hold", "end", "delete", "restore") and len(rest) == 1:
+        return {"watch": lambda a: cmd_watch(a, True), "unwatch": lambda a: cmd_watch(a, False), "mode": cmd_mode,
+                "hold": cmd_hold, "end": cmd_end, "delete": cmd_delete, "restore": cmd_restore}[c](rest[0])
+    raise SystemExit(__doc__)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

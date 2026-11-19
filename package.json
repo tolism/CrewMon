@@ -1,0 +1,92 @@
+{
+  "name": "crewmon",
+  "displayName": "CrewMon",
+  "description": "CrewMon (Crew Monitor): a live map of your Claude Code agents. Hover for what each one is in charge of, click to open it, keep it running with the keeper.",
+  "version": "0.5.0",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "crewmon.open",
+        "title": "CrewMon: Open",
+        "icon": "$(organization)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "crewmon.open",
+        "key": "ctrl+alt+a"
+      }
+    ],
+    "configuration": {
+      "title": "CrewMon",
+      "properties": {
+        "crewmon.days": {
+          "type": "number",
+          "default": 7,
+          "description": "Show sessions active in the last N days."
+        },
+        "crewmon.aiDescriptions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Write a one-line 'In charge of' for each session from its latest summary, with a small model (Haiku). Cached; redone only when a new summary appears."
+        },
+        "crewmon.refreshSeconds": {
+          "type": "number",
+          "default": 5,
+          "description": "How often the map refreshes."
+        },
+        "crewmon.quickMessages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "Status?",
+            "Continue",
+            "Summarise where you are in 5 lines",
+            "Stop after this step",
+            "Commit your work (no Claude co-author line)",
+            "What do you need from me?"
+          ],
+          "description": "The one-click messages under the message bar."
+        },
+        "crewmon.critter": {
+          "type": "string",
+          "enum": [
+            "bot",
+            "blob",
+            "bug"
+          ],
+          "default": "bot",
+          "enumDescriptions": [
+            "A small crew robot with a glowing visor",
+            "A round pixel slime",
+            "A round beetle with six little legs"
+          ],
+          "description": "How the agents are drawn (you can also switch it in the map's top bar)."
+        }
+      }
+    }
+  },
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tolism/CrewMon.git"
+  },
+  "homepage": "https://github.com/tolism/CrewMon#readme"
+}

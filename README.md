@@ -1,0 +1,199 @@
+<p align="center"><img src="media/icon.png" width="110" alt="CrewMon"></p>
+
+<h1 align="center">CrewMon</h1>
+<p align="center"><b>Crew Monitor for your Claude Code agents, inside VS Code.</b><br>
+See every agent at a glance, know what each one is doing, and talk to them, all from one map.</p>
+
+---
+
+When you run several Claude Code chats at once, it gets hard to keep track of which one is working on what, which
+are still running, and which you left days ago. CrewMon turns them into a small crew of critters on one map.
+
+<p align="center"><img src="docs/styles.png" width="360" alt="The three critter styles (Bot, Blob, Bug) in the four state colours"></p>
+
+## Features
+
+- **🗺️ Live map**: one critter per agent (a **Bot**, **Blob** or **Bug**, your choice), grouped by project or by
+  your own groups. Each keeps its own accessory (hat, crown, headphones, …), and its colour shows the state: **orange** busy, **green** idle in VS Code, **blue** running on the machine,
+  **grey** asleep.
+- **💭 What it's doing**: busy agents show a speech bubble (*editing extension.js*, *running tests*).
+- **❗ Needs you**: a red badge when an agent is waiting for your answer or approval.
+- **🧾 In charge of**: hover for a one-line description of each agent's job, written by AI from its own summary,
+  or by you.
+- **💬 Message from the map**: select an agent, type, press Enter, or click a quick chip (*Status?*, *Continue*,
+  *Summarise where you are*). Select several to message them all.
+- **🤝 Agent to agent**: drag one critter onto another to **hand over** work, **ask** a question, or let them
+  **talk** for a few turns.
+- **🛟 Keep alive**: the keeper keeps an agent running on the machine when VS Code closes it, so you can keep using
+  it from the Claude app on your phone.
+- **✏️ Organise**: rename agents, put them in groups, arrange them freely, delete old ones (to a trash you can
+  restore from).
+- **🎨 Make it yours**: pick the critter (🤖) and the background (🎨: Meadow, Starfield, Blueprint, Dots, Plain)
+  in the top bar.
+
+## Install
+
+### Requirements
+- **VS Code** 1.85 or newer with the **Claude Code** extension, signed in.
+- **Linux** for the live state (busy, idle, running). CrewMon reads the process list from `/proc`. It is also where
+  VS Code runs over Remote-SSH.
+- **Python 3**, to build the package. The keeper and the messenger also need **tmux**.
+
+### 1. Get the package
+Either use a ready `crewmon-<version>.vsix`, or build it from this repository:
+```bash
+git clone <this repository> CrewMon
+cd CrewMon
+python3 build_vsix.py           # -> dist/crewmon-<version>.vsix
+```
+No Node or npm is needed: the build uses only Python's standard library.
+
+### 2. Install it in VS Code
+- **Extensions** view (`Ctrl+Shift+X`) → **⋯** → **Install from VSIX…** → pick the `.vsix`.
+- Or from a terminal: `code --install-extension dist/crewmon-<version>.vsix`
+- **Working over SSH (Remote-SSH)?** Install it while connected; it runs on the remote machine, where your agents are.
+  From a terminal on that machine you can also use
+  `~/.vscode-server/cli/servers/<version>/server/bin/code-server --install-extension <absolute path to the .vsix>`.
+
+Then run **Developer: Reload Window** once. Reloading restarts the Claude chats in VS Code, so do it when none is in
+the middle of a task.
+
+### 3. Optional: the keeper command
+To use the keeper from a terminal as well, put it on your PATH:
+```bash
+ln -s "$PWD/keeper/keeper" ~/.local/bin/keeper
+```
+
+## Quick start
+
+1. Press **Ctrl+Alt+A**, click **Crew** in the status bar, or run **CrewMon: Open** from the command palette.
+2. **Hover** a critter to see what it is in charge of. **Click** it to select it. **Double-click** opens the chat.
+3. With a critter selected, use the panel at the bottom: type a message and press **Enter**, or click a chip.
+4. **Drag** a critter onto another one for *Hand over*, *Ask* or *Let them talk*. Drag it onto the dock at the bottom
+   for *Keep alive*, *Trash* or a group.
+5. Press **?** for the keyboard shortcuts.
+
+## Using CrewMon
+
+### The map
+| You see | It means |
+|---|---|
+| 🟠 orange critter, hopping | busy right now; the bubble says what it is doing |
+| 🟢 green | open in VS Code, idle |
+| 🔵 blue, with a server badge | running on the machine (kept alive by the keeper) |
+| ⚪ grey, asleep | not running; double-click to wake it in VS Code |
+| ❗ red badge | waiting for you: a question, or most likely an approval |
+| bigger critter | active more recently |
+
+The top bar has the filter (`/`), *running only*, the layout switch (*Grouped* / *Free*), the background, and the
+status of the keeper and the messenger.
+
+### The panel (click a critter)
+↗ **Open** · ✏️ **Rename** · 📝 **Description** · 🛟 **Keep alive** · 📋 **Id** · 🗑 **Delete**, then the
+**message bar** with the **quick chips**. Shift- or Ctrl-click to select several agents; the message goes to all of
+them.
+
+### Drag and drop
+- **Onto another critter**:
+  - **Hand over to it**: A writes a hand-over note (goal, what's done, decisions, where things are, open problems,
+    next steps); then B is told to read it and continue. Notes are kept in `~/.claude/crewmon/handovers/`.
+  - **Ask it a question**: B answers; the answer goes to you and to A.
+  - **Let them talk about…**: A and B discuss a topic for 1–4 turns each, then A sends you a summary.
+- **Onto the dock**: 🛟 *Keep alive* · 🗑 *Trash* · 📁 a group · *＋ New group* · *↩ No group*.
+- **In the Free layout**: drag a critter anywhere; CrewMon remembers where.
+
+### Keyboard
+`←` `→` `↑` `↓` move · `Enter` open · `M` message · `R` rename · `D` description · `K` keep alive · `Del` trash ·
+`/` filter · `Esc` clear · `?` help
+
+## The messenger: talking to agents directly
+
+Without the messenger, CrewMon sends a message by opening the chat with your text typed in, and you press Enter there.
+**With the messenger, CrewMon delivers the message itself and shows the reply on the map** (a 💬 bubble and a
+notification). *Ask* and *Talk* need it.
+
+The messenger is a background Claude Code session (tmux `crewmon-messenger`) running a small add-on that uses Claude
+Code's built-in session-to-session messaging. It only passes messages along: its own AI never runs, so it costs nothing
+by itself. Each message is a normal turn for the agent that receives it.
+
+**Turn it on:** click **start** next to *messenger* in the top bar. The first time, Claude asks whether to trust the
+messenger's folder (`~/.claude/crewmon/messenger`). Run `tmux attach -t crewmon-messenger`, choose
+*Yes, I trust this folder*, then press `Ctrl+b` `d` to leave it running. It shows **● messenger on** when ready.
+
+**Look inside:** `tmux attach -t crewmon-messenger` shows its screen. `~/.claude/crewmon/messenger/inbox.jsonl` lists
+what was delivered and every reply (`tail -f` it to watch live).
+
+Claude Code delivers a message from another session straight away only when both use the same kind of permission
+mode; otherwise it holds the message for your approval in that chat.
+
+## The keeper: agents that stay alive
+
+`keeper` keeps chats usable from the Claude app when VS Code closes them. When a watched chat stops running in VS Code,
+the keeper resumes it on the machine in tmux with Remote Control on. When you reopen it in VS Code, the keeper hands it
+back.
+
+- In CrewMon: **🛟 Keep alive** (or drag onto 🛟). Its state is shown in the top bar and on each hover card.
+- In a terminal: `keeper start | stop | status | watch <id> | hold <id> | end <id> | delete <id> | restore <id> | purge`.
+- It starts in **allowlist** mode: it manages only the chats you mark. `keeper mode all` manages every chat seen in
+  VS Code.
+
+## Settings
+
+| Setting | Default | |
+|---|---|---|
+| `crewmon.days` | 7 | show agents active in the last N days |
+| `crewmon.refreshSeconds` | 5 | how often the map refreshes |
+| `crewmon.aiDescriptions` | true | write the one-line *In charge of* with a small model (Haiku), once per summary |
+| `crewmon.quickMessages` | 6 chips | the one-click messages under the message bar |
+| `crewmon.critter` | `bot` | how agents are drawn: `bot`, `blob` or `bug` (also in the top bar) |
+
+## Privacy and safety
+
+- CrewMon runs **only on your machine**. It reads your Claude Code chat files (`~/.claude/projects`) and the process
+  list, and keeps its own small files in `~/.claude/crewmon/` (your descriptions, groups, the messenger's in/outbox).
+- It **never changes a chat**, with one exception: *Rename* on a chat that is not running adds the same title line that
+  Claude Code's own rename writes.
+- **Delete** asks first, refuses while the chat is open in VS Code, and moves the files to the keeper's trash
+  (`keeper restore <id>` brings them back; `keeper purge` empties it for good).
+- AI descriptions are made with your own Claude login (`claude -p --model haiku`, no tools, nothing saved as a chat).
+  Turn them off with `crewmon.aiDescriptions`.
+- Messages sent through CrewMon are normal messages to your agents. They act on them with the permissions those chats
+  already have.
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| The map is empty or the command is missing after an update | **Developer: Reload Window** |
+| "keeper not found" | reload the window; check `keeper status` in a terminal |
+| Messenger stays on "starting…" | `tmux attach -t crewmon-messenger` and accept the folder-trust question |
+| A message was not delivered | look at `~/.claude/crewmon/messenger/inbox.jsonl` for an `error` line |
+| Rename did nothing | for a chat open in VS Code, CrewMon opens Claude's own *Rename* box; type the name there |
+| No live state (all grey) | CrewMon needs Linux (`/proc`) |
+
+## Development
+
+```
+package.json        extension manifest (command, Ctrl+Alt+A, settings)
+extension.js        the VS Code side: the tab, refresh, actions, keeper, messenger, AI descriptions
+snapshot.js         reads the sessions (node snapshot.js prints them in a terminal)
+media/map.html      the map
+media/critters.js   the critters: three styles, 11 accessories, a pose per state
+keeper/keeper       the keeper (Python; state, log and trash in ~/.claude/keeper/)
+messenger/          the messenger add-on (runs in the background session)
+build_vsix.py       builds dist/crewmon-<version>.vsix
+make_icon.py        draws media/icon.png (needs Pillow)
+tools/gallery.js    draws the preview sheets: node tools/gallery.js bot > docs/critters.svg, … styles > docs/styles.svg
+```
+Edit, run `python3 build_vsix.py`, install the new `.vsix`, and reload the window.
+
+All 11 accessories on the default Bot, in every state:
+
+<p align="center"><img src="docs/critters.png" width="380" alt="All Bot variations: 11 accessories by 4 states"></p>
+
+## License
+
+MIT, see [LICENSE](LICENSE). Copyright (c) 2026 tolism.
+
+CrewMon is an independent tool, not made by or affiliated with Anthropic. "Claude" and "Claude Code" are trademarks of
+Anthropic. The critters and the logo are CrewMon's own designs.

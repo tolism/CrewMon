@@ -1,0 +1,8 @@
+dist/
+__pycache__/
+*.pyc
+.claude/
+node_modules/
+# written by Claude Code when it loads the messenger (machine-specific, regenerated)
+messenger/.claude-plugin/types/
+messenger/tsconfig.json
