@@ -138,6 +138,10 @@
   kbd { border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; font-size: 11px; }
 
   /* ================= polish layer (one system) ================= */
+  [hidden] { display: none !important; }   /* the View menu and other hidden parts stay hidden whatever their display */
+  .pop select, header select { background: var(--vscode-dropdown-background, var(--input)); color: var(--vscode-dropdown-foreground, var(--inputfg));
+    border: 1px solid var(--vscode-dropdown-border, var(--border)); padding: 3px 6px; font: inherit; border-radius: var(--r2); }
+  .pop .seg { justify-self: start; }
   :root { --r1: 4px; --r2: 8px; --r3: 12px; --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
     --room: color-mix(in srgb, var(--bg) 82%, transparent); --room-line: color-mix(in srgb, var(--fg) 12%, transparent);
     --raise: 0 6px 22px rgba(0,0,0,.28); --soft: color-mix(in srgb, var(--fg) 7%, transparent); }
