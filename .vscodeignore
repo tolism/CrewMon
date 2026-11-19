@@ -1,0 +1,12 @@
+# what users do not need inside the installed extension
+.git/**
+.gitignore
+dist/**
+tools/**
+build_vsix.py
+make_icon.py
+docs/*.svg
+media/icon.svg
+messenger/.claude-plugin/types/**
+messenger/tsconfig.json
+**/__pycache__/**

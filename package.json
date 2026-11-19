@@ -3,12 +3,14 @@
   "displayName": "CrewMon",
   "description": "CrewMon (Crew Monitor): a live map of your Claude Code agents. Hover for what each one is in charge of, click to open it, keep it running with the keeper.",
   "version": "0.5.0",
-  "publisher": "local",
+  "publisher": "tolism",
   "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
+    "AI",
+    "Visualization",
     "Other"
   ],
   "extensionKind": [
@@ -88,5 +90,22 @@
     "type": "git",
     "url": "https://github.com/tolism/CrewMon.git"
   },
-  "homepage": "https://github.com/tolism/CrewMon#readme"
+  "homepage": "https://github.com/tolism/CrewMon#readme",
+  "keywords": [
+    "claude",
+    "claude code",
+    "agents",
+    "ai",
+    "sessions",
+    "monitor",
+    "dashboard",
+    "remote control"
+  ],
+  "galleryBanner": {
+    "color": "#1F2430",
+    "theme": "dark"
+  },
+  "bugs": {
+    "url": "https://github.com/tolism/CrewMon/issues"
+  }
 }
