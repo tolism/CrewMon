@@ -306,6 +306,8 @@ const ICONS = {
   view: '<path d="M2 4h12M2 8h12M2 12h12"/><circle cx="5" cy="4" r="1.2"/><circle cx="11" cy="8" r="1.2"/><circle cx="7" cy="12" r="1.2"/>',
   reply: '<path d="M3 4h10v7H7l-3 2.5V11H3z"/>',
   x: '<path d="M4 4l8 8M12 4l-8 8"/>',
+  handover: '<path d="M2 8h9"/><path d="M8 5l3 3-3 3"/><path d="M13.5 3v10"/>',
+  ask: '<path d="M3 4h10v7H7l-3 2.5V11H3z"/><path d="M7 6.5a1.2 1.2 0 1 1 1.6 1.1c-.4.2-.6.4-.6.8"/><path d="M8 9.6v.1"/>',
 };
 const ic = (n) => '<svg class="ico" viewBox="0 0 16 16" aria-hidden="true">' + (ICONS[n] || '') + '</svg>';
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -541,6 +543,8 @@ function renderPanel() {
     else btn('keep', inVS && watched(one) ? 'Watched' : 'Keep alive',
       inVS ? 'Let the keeper keep it running when VS Code closes it (K)' : 'Run it on the machine now, reachable from the Claude app (K)',
       () => keepAlive(one), inVS && watched(one));
+    btn('handover', 'Hand over…', 'Pass this work to another agent: it writes a note, the other continues', (e) => pickPartner(one, 'handover', e));
+    btn('ask', 'Ask…', 'Ask another agent a question for this one (needs the messenger)', (e) => pickPartner(one, 'ask', e), !messengerOn);
     btn('copy', '', 'Copy the session id', () => post({ type: 'copy', text: one.id }));
     btn('trash', '', inVS ? 'Close it in VS Code before deleting' : 'Delete to trash (Del)', () => post({ type: 'keeper', action: 'delete', id: one.id, title: one.title }), inVS);
   } else {
@@ -669,6 +673,10 @@ function showMenu(s, ev) {
     ['Edit description…', () => post({ type: 'role', id: s.id, title: s.title, desc: role(s) })],
     ['Copy session id', () => post({ type: 'copy', text: s.id })],
     ['-'],
+    ['Hand over to…', () => pickPartner(s, 'handover', ev)],
+    ['Ask another agent…', () => pickPartner(s, 'ask', ev), messengerOn ? false : 'Needs the messenger (top bar)'],
+    ['Let it talk with…', () => pickPartner(s, 'talk', ev), messengerOn ? false : 'Needs the messenger (top bar)'],
+    ['-'],
     [watched(s) ? 'Keeper: stop watching' : 'Keeper: watch (keep alive when VS Code closes it)',
       () => post({ type: 'keeper', action: watched(s) ? 'unwatch' : 'watch', id: s.id }), keeper && keeper.mode === 'all' && !(kinfo(s) || {}).managed],
     ['Keeper: keep running on the machine now', () => post({ type: 'keeper', action: 'hold', id: s.id }), inVS || onM],
@@ -676,6 +684,18 @@ function showMenu(s, ev) {
     ['-'],
     ['Delete chat (to trash)…', () => post({ type: 'keeper', action: 'delete', id: s.id, title: s.title }), inVS ? 'Close it in VS Code first' : false],
   ], ev);
+}
+function pickPartner(a, kind, ev) {
+  const others = sessions.filter(s => s.id !== a.id).sort((x, y) => (rank[bucket(x)] - rank[bucket(y)]) || (x.ageS - y.ageS));
+  const verb = { handover: 'Hand over to', ask: 'Ask', talk: 'Talk with' }[kind];
+  const items = [[verb + '…  (who?)', 'head']];
+  for (const b of others.slice(0, 25)) {
+    const asleep = b.state === 'offline';
+    items.push([b.title.slice(0, 48) + '  ·  ' + (b.needsYou ? 'needs you' : asleep ? 'asleep' : b.state),
+      () => post({ type: kind, from: a.id, to: b.id, fromTitle: a.title, toTitle: b.title }),
+      asleep ? 'Asleep: double-click it first to wake it' : (kind !== 'handover' && !messengerOn ? 'Needs the messenger (top bar)' : false)]);
+  }
+  openMenu(items, ev);
 }
 function pairMenu(a, b, ev) {
   if (!a || !b) return;

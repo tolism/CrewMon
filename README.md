@@ -89,12 +89,13 @@ The top bar has the filter (`/`), *running only*, the layout switch (*Grouped* /
 status of the keeper and the messenger.
 
 ### The panel (click a critter)
-↗ **Open** · ✏️ **Rename** · 📝 **Description** · 🛟 **Keep alive** · 📋 **Id** · 🗑 **Delete**, then the
+**Open** · **Rename** · **Describe** · **Keep alive** · **Hand over…** · **Ask…** · copy id · delete, then the
 **message bar** with the **quick chips**. Shift- or Ctrl-click to select several agents; the message goes to all of
 them.
 
 ### Drag and drop
-- **Onto another critter**:
+- **Onto another critter** (or use **Hand over…** / **Ask…** in the agent card, or the right-click menu, and pick
+  the other agent from a list):
   - **Hand over to it**: A writes a hand-over note (goal, what's done, decisions, where things are, open problems,
     next steps); then B is told to read it and continue. Notes are kept in `~/.claude/crewmon/handovers/`.
   - **Ask it a question**: B answers; the answer goes to you and to A.
