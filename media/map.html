@@ -77,7 +77,7 @@
                       linear-gradient(color-mix(in srgb, #7aa2ff 7%, transparent) 1px, transparent 1px),
                       linear-gradient(90deg, color-mix(in srgb, #7aa2ff 7%, transparent) 1px, transparent 1px);
     background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px; }
-  #main.bg-stars { background-color: #0d1020; color: #e8eaf0;
+  #main.bg-stars { background-color: #0d1020;
     background-image: radial-gradient(1px 1px at 20px 30px, #fff, transparent), radial-gradient(1px 1px at 120px 80px, #cfd8ff, transparent),
       radial-gradient(1.5px 1.5px at 200px 150px, #fff, transparent), radial-gradient(1px 1px at 300px 40px, #ffe9c4, transparent),
       radial-gradient(1px 1px at 380px 210px, #fff, transparent), radial-gradient(1.5px 1.5px at 60px 220px, #cfd8ff, transparent),
@@ -85,7 +85,6 @@
       linear-gradient(180deg, #0b0e1c 0%, #141a33 100%);
     background-size: 420px 300px, 420px 300px, 420px 300px, 420px 300px, 420px 300px, 420px 300px, 420px 300px, 420px 300px, 100% 100%;
     animation: twinkle 6s ease-in-out infinite; }
-  #main.bg-stars .group h2, #main.bg-stars .node .t { color: #e8eaf0; } #main.bg-stars .node .s { color: #aab0c4; }
   @keyframes twinkle { 50% { filter: brightness(1.25); } }
   #main.bg-meadow { background-color: #bfe3f5;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='40' shape-rendering='crispEdges'%3E%3Crect y='16' width='96' height='24' fill='%2361b15a'/%3E%3Crect y='12' width='8' height='4' fill='%2361b15a'/%3E%3Crect x='16' y='8' width='8' height='8' fill='%2361b15a'/%3E%3Crect x='40' y='12' width='16' height='4' fill='%2361b15a'/%3E%3Crect x='72' y='8' width='8' height='8' fill='%2361b15a'/%3E%3Crect x='88' y='12' width='8' height='4' fill='%2361b15a'/%3E%3Crect x='8' y='24' width='4' height='4' fill='%234f9a49'/%3E%3Crect x='52' y='28' width='4' height='4' fill='%234f9a49'/%3E%3Crect x='80' y='22' width='4' height='4' fill='%23f2c14e'/%3E%3Crect x='30' y='30' width='4' height='4' fill='%23f49ac1'/%3E%3C/svg%3E"),
@@ -93,8 +92,6 @@
       linear-gradient(180deg, #a9dcf3 0%, #e4f4fb 75%);
     background-repeat: repeat-x, repeat, no-repeat; background-position: left bottom, 0 0, 0 0; background-size: 96px 40px, 360px 120px, 100% 100%;
     background-attachment: local, local, local; }
-  #main.bg-meadow .group h2, #main.bg-meadow .node .t { color: #1f2a37; } #main.bg-meadow .node .s { color: #3c4a5c; }
-  #main.bg-meadow .node:hover, #main.bg-meadow .node.sel { background: rgba(255,255,255,.55); }
   #main.bg-meadow #groups, #main.bg-meadow #free { padding-bottom: 60px; }
   @media (prefers-reduced-motion: reduce) { #main.bg-stars { animation: none; } .busy .critter, .busy .critter path, .badge { animation: none; } }
 
@@ -139,32 +136,133 @@
   #help { position: fixed; right: 14px; bottom: 14px; z-index: 25; display: none; background: var(--card); border: 1px solid var(--border);
     border-radius: 6px; padding: 10px 14px; font-size: 12px; line-height: 1.7; }
   kbd { border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; font-size: 11px; }
+
+  /* ================= polish layer (one system) ================= */
+  :root { --r1: 4px; --r2: 8px; --r3: 12px; --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
+    --room: color-mix(in srgb, var(--bg) 82%, transparent); --room-line: color-mix(in srgb, var(--fg) 12%, transparent);
+    --raise: 0 6px 22px rgba(0,0,0,.28); --soft: color-mix(in srgb, var(--fg) 7%, transparent); }
+  .ico { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  button, .btn { display: inline-flex; align-items: center; gap: 6px; border-radius: var(--r2); padding: 5px 11px; transition: transform .12s, background .12s, border-color .12s; }
+  button:hover:not(:disabled) { transform: translateY(-1px); }
+  button:active:not(:disabled) { transform: translateY(0) scale(.97); }
+  button.ghost { border: 1px solid var(--room-line); background: var(--soft); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  input[type=search], input[type=text], select { border-radius: var(--r2); }
+
+  /* top bar */
+  header { gap: var(--s3); padding: 10px 18px; background: var(--vscode-sideBar-background, var(--bg)); }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; letter-spacing: .01em; }
+  .brand svg { width: 26px; height: 26px; }
+  .search { position: relative; display: flex; align-items: center; }
+  .search .ico { position: absolute; left: 8px; color: var(--muted); pointer-events: none; }
+  .search input { padding-left: 28px; min-width: 200px; }
+  #summary { display: flex; gap: 6px; flex-wrap: wrap; }
+  .stat { border: 1px solid var(--room-line); border-radius: 999px; padding: 2px 10px; background: transparent; color: var(--fg); font-size: 12px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+  .stat b { font-variant-numeric: tabular-nums; }
+  .stat i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .stat.on { background: color-mix(in srgb, var(--accent) 22%, transparent); border-color: var(--accent); }
+  .stat.alert { border-color: var(--alert); color: var(--fg); }
+  .spacer { flex: 1; }
+  .pill { font-size: 12px; border-color: var(--room-line); }
+  .pop { position: fixed; z-index: 35; background: var(--vscode-menu-background, var(--card)); color: var(--fg); border: 1px solid var(--border);
+    border-radius: var(--r3); padding: 12px 14px; box-shadow: var(--raise); display: grid; grid-template-columns: auto 1fr; gap: 10px 14px; align-items: center; min-width: 320px; }
+  .pop .k { color: var(--muted); font-size: 12px; }
+  .pop .legend { margin: 0; }
+
+  /* the map: rooms */
+  #groups { display: flex; flex-direction: column; gap: var(--s4); padding: var(--s4) 22px 90px; }
+  .group { background: var(--room); border: 1px solid var(--room-line); border-radius: var(--r3); padding: 10px 14px 14px; backdrop-filter: blur(6px); }
+  .group h2 { margin: 0 0 8px; display: flex; align-items: baseline; gap: 8px; color: var(--fg); font-size: 11.5px; }
+  .group h2 span { color: var(--muted); font-weight: 400; letter-spacing: 0; text-transform: none; }
+  #main .group h2, #main .node .t { color: var(--fg); } #main .node .s { color: var(--muted); }
+  .row { gap: 10px; }
+  .node { width: 140px; border-radius: var(--r3); transition: transform .14s, background .14s, border-color .14s; }
+  .node:hover { transform: translateY(-2px); background: var(--soft); }
+  #free .node { background: var(--room); border: 1px solid var(--room-line); backdrop-filter: blur(6px); }
+  .node.sel { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--room)); }
+  .node.needs::before { content: ""; position: absolute; left: 50%; top: 56px; width: 70px; height: 70px; margin: -35px 0 0 -35px; border-radius: 50%;
+    border: 2px solid var(--alert); animation: ring 1.8s ease-out infinite; pointer-events: none; }
+  @keyframes ring { 0% { transform: scale(.7); opacity: .9 } 100% { transform: scale(1.25); opacity: 0 } }
+  .badge { animation: none; top: 24px; right: 28px; }
+  .busy .critter path, .busy .critter rect { animation: none; }
+  .bubble { display: inline-flex; align-items: center; gap: 4px; border-radius: var(--r2); box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+  .bubble .ico { width: 12px; height: 12px; }
+
+  /* selection card */
+  #panel { padding: 12px 18px 14px; box-shadow: 0 -6px 18px rgba(0,0,0,.18); }
+  .pcard { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; }
+  #pav { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; border-radius: var(--r3); background: var(--soft); }
+  #pav.multi { width: auto; padding: 0 8px; gap: 0; }
+  #pav.multi svg { margin-left: -10px; } #pav.multi svg:first-child { margin-left: 0; }
+  .pmain { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  #panel .who { font-size: 14px; max-width: none; }
+  #panel .what { font-size: 12.5px; color: var(--fg); opacity: .85; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  #pmeta { color: var(--muted); font-size: 11.5px; }
+  #panel .actions { gap: 6px; justify-content: flex-end; }
+  #panel .actions button { padding: 5px 9px; }
+  #panel .msg { margin-top: 10px; }
+  #panel .msg input { padding: 7px 10px; }
+  .chip { border-radius: 999px; padding: 3px 11px; transition: border-color .12s, transform .12s; }
+  .chip:hover { transform: translateY(-1px); }
+
+  /* dock */
+  #dock { gap: 8px; padding: 8px 18px; background: var(--vscode-sideBar-background, var(--bg)); }
+  .zone { display: inline-flex; align-items: center; gap: 6px; border-radius: var(--r2); padding: 4px 10px; transition: background .12s, border-color .12s; }
+  body.dragging #dock { box-shadow: 0 -6px 18px rgba(0,0,0,.22); }
+  body.dragging .zone { border-style: solid; color: var(--fg); }
+  #empty { text-align: center; padding: 60px 16px; }
+  #empty .ico { width: 0; }
+  #main.bg-stars { animation: none; }
+  @media (prefers-reduced-motion: reduce) { .node.needs::before { animation: none; opacity: .8; } .node, button, .chip { transition: none; } }
+
+  /* ---- scenes (generated, no downloads) ---- */
+  #main.bg-city { background-color: #141a36;
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22480%22%20height%3D%22170%22%20shape-rendering%3D%22crispEdges%22%3E%3Crect%20x%3D%220%22%20y%3D%2260%22%20width%3D%2230%22%20height%3D%22110%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%2230%22%20y%3D%2279%22%20width%3D%2236%22%20height%3D%2291%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%2266%22%20y%3D%2268%22%20width%3D%2218%22%20height%3D%22102%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%2288%22%20y%3D%2297%22%20width%3D%2218%22%20height%3D%2273%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%22110%22%20y%3D%2262%22%20width%3D%2218%22%20height%3D%22108%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%22132%22%20y%3D%22118%22%20width%3D%2224%22%20height%3D%2252%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%22156%22%20y%3D%2294%22%20width%3D%2236%22%20height%3D%2276%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%22192%22%20y%3D%22115%22%20width%3D%2224%22%20height%3D%2255%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%22220%22%20y%3D%22117%22%20width%3D%2236%22%20height%3D%2253%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%22260%22%20y%3D%2260%22%20width%3D%2218%22%20height%3D%22110%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%22278%22%20y%3D%2284%22%20width%3D%2218%22%20height%3D%2286%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%22300%22%20y%3D%22117%22%20width%3D%2236%22%20height%3D%2253%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%22336%22%20y%3D%2285%22%20width%3D%2218%22%20height%3D%2285%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%22354%22%20y%3D%2294%22%20width%3D%2230%22%20height%3D%2276%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%22384%22%20y%3D%2284%22%20width%3D%2218%22%20height%3D%2286%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%22404%22%20y%3D%22114%22%20width%3D%2224%22%20height%3D%2256%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%22432%22%20y%3D%2297%22%20width%3D%2224%22%20height%3D%2273%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%22456%22%20y%3D%2284%22%20width%3D%2218%22%20height%3D%2286%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%22474%22%20y%3D%2289%22%20width%3D%2224%22%20height%3D%2281%22%20fill%3D%22%231a2140%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%2281%22%20width%3D%2246%22%20height%3D%2289%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%2218%22%20y%3D%2287%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%2232%22%20y%3D%2287%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%2239%22%20y%3D%2287%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%2218%22%20y%3D%2295%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%2225%22%20y%3D%2295%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%2232%22%20y%3D%2295%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%2239%22%20y%3D%2295%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%2218%22%20y%3D%22103%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%2239%22%20y%3D%22103%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%2225%22%20y%3D%22111%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%2211%22%20y%3D%22119%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%2218%22%20y%3D%22119%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%2239%22%20y%3D%22119%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%2211%22%20y%3D%22127%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%2239%22%20y%3D%22127%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%224%22%20y%3D%22135%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%2232%22%20y%3D%22135%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%2225%22%20y%3D%22143%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%2211%22%20y%3D%22151%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%2218%22%20y%3D%22151%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%2232%22%20y%3D%22151%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%2239%22%20y%3D%22151%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%224%22%20y%3D%22159%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%2225%22%20y%3D%22159%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%2252%22%20y%3D%22101%22%20width%3D%2228%22%20height%3D%2269%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%2270%22%20y%3D%22115%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%2263%22%20y%3D%22123%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%2256%22%20y%3D%22131%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%2263%22%20y%3D%22131%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%2256%22%20y%3D%22147%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%2270%22%20y%3D%22147%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%2256%22%20y%3D%22163%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%2284%22%20y%3D%22125%22%20width%3D%2240%22%20height%3D%2245%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%22103%22%20y%3D%22115%22%20width%3D%222%22%20height%3D%2210%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%22102%22%20y%3D%22113%22%20width%3D%224%22%20height%3D%222%22%20fill%3D%22%23E5484D%22%2F%3E%3Crect%20x%3D%2288%22%20y%3D%22139%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%2288%22%20y%3D%22147%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22109%22%20y%3D%22147%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%2295%22%20y%3D%22155%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22109%22%20y%3D%22155%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22102%22%20y%3D%22163%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22126%22%20y%3D%2297%22%20width%3D%2234%22%20height%3D%2273%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%22130%22%20y%3D%22111%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22151%22%20y%3D%22119%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22137%22%20y%3D%22127%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22130%22%20y%3D%22143%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22137%22%20y%3D%22143%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22137%22%20y%3D%22151%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22144%22%20y%3D%22151%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22151%22%20y%3D%22159%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22162%22%20y%3D%2293%22%20width%3D%2234%22%20height%3D%2277%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%22173%22%20y%3D%2299%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22180%22%20y%3D%22107%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22173%22%20y%3D%22115%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22180%22%20y%3D%22123%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22187%22%20y%3D%22123%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22166%22%20y%3D%22131%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22173%22%20y%3D%22131%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22187%22%20y%3D%22131%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22173%22%20y%3D%22155%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22173%22%20y%3D%22163%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22202%22%20y%3D%22110%22%20width%3D%2228%22%20height%3D%2260%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%22213%22%20y%3D%22124%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22220%22%20y%3D%22124%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22232%22%20y%3D%2295%22%20width%3D%2240%22%20height%3D%2275%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%22236%22%20y%3D%22101%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22243%22%20y%3D%22101%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22257%22%20y%3D%22101%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22264%22%20y%3D%22101%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22236%22%20y%3D%22109%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22257%22%20y%3D%22109%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22243%22%20y%3D%22117%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22257%22%20y%3D%22117%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22257%22%20y%3D%22125%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22257%22%20y%3D%22133%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22264%22%20y%3D%22133%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22264%22%20y%3D%22141%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22236%22%20y%3D%22149%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22250%22%20y%3D%22149%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22257%22%20y%3D%22149%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22264%22%20y%3D%22149%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22278%22%20y%3D%2286%22%20width%3D%2246%22%20height%3D%2284%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%22282%22%20y%3D%2292%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22289%22%20y%3D%2292%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22296%22%20y%3D%2292%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22317%22%20y%3D%2292%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22282%22%20y%3D%22100%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22296%22%20y%3D%22100%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22282%22%20y%3D%22108%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22289%22%20y%3D%22108%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22303%22%20y%3D%22108%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22310%22%20y%3D%22108%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22289%22%20y%3D%22116%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22303%22%20y%3D%22116%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22282%22%20y%3D%22124%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22303%22%20y%3D%22124%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22310%22%20y%3D%22124%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22317%22%20y%3D%22124%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22289%22%20y%3D%22140%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22303%22%20y%3D%22140%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22282%22%20y%3D%22148%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22296%22%20y%3D%22148%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22303%22%20y%3D%22148%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22289%22%20y%3D%22156%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22303%22%20y%3D%22156%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22310%22%20y%3D%22156%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22317%22%20y%3D%22156%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22328%22%20y%3D%22115%22%20width%3D%2240%22%20height%3D%2255%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%22347%22%20y%3D%22105%22%20width%3D%222%22%20height%3D%2210%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%22346%22%20y%3D%22103%22%20width%3D%224%22%20height%3D%222%22%20fill%3D%22%23E5484D%22%2F%3E%3Crect%20x%3D%22339%22%20y%3D%22121%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22346%22%20y%3D%22121%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22353%22%20y%3D%22121%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22332%22%20y%3D%22129%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22346%22%20y%3D%22129%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22353%22%20y%3D%22129%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22360%22%20y%3D%22129%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22332%22%20y%3D%22137%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22339%22%20y%3D%22137%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22360%22%20y%3D%22137%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22332%22%20y%3D%22153%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22346%22%20y%3D%22153%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22346%22%20y%3D%22161%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22370%22%20y%3D%22125%22%20width%3D%2234%22%20height%3D%2245%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%22386%22%20y%3D%22115%22%20width%3D%222%22%20height%3D%2210%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%22385%22%20y%3D%22113%22%20width%3D%224%22%20height%3D%222%22%20fill%3D%22%23E5484D%22%2F%3E%3Crect%20x%3D%22374%22%20y%3D%22131%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22374%22%20y%3D%22139%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22374%22%20y%3D%22147%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22381%22%20y%3D%22155%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22381%22%20y%3D%22163%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22388%22%20y%3D%22163%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22408%22%20y%3D%22126%22%20width%3D%2246%22%20height%3D%2244%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%22440%22%20y%3D%22132%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22447%22%20y%3D%22132%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22419%22%20y%3D%22140%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22426%22%20y%3D%22140%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22433%22%20y%3D%22140%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22447%22%20y%3D%22140%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22419%22%20y%3D%22148%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22426%22%20y%3D%22148%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22440%22%20y%3D%22148%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22447%22%20y%3D%22148%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22419%22%20y%3D%22156%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22426%22%20y%3D%22156%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22447%22%20y%3D%22156%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22456%22%20y%3D%2293%22%20width%3D%2228%22%20height%3D%2277%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%22469%22%20y%3D%2283%22%20width%3D%222%22%20height%3D%2210%22%20fill%3D%22%23232a52%22%2F%3E%3Crect%20x%3D%22468%22%20y%3D%2281%22%20width%3D%224%22%20height%3D%222%22%20fill%3D%22%23E5484D%22%2F%3E%3Crect%20x%3D%22467%22%20y%3D%2299%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22474%22%20y%3D%2299%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%239FE3B4%22%2F%3E%3Crect%20x%3D%22460%22%20y%3D%22115%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22474%22%20y%3D%22115%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22474%22%20y%3D%22131%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22460%22%20y%3D%22139%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22474%22%20y%3D%22139%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3Crect%20x%3D%22474%22%20y%3D%22147%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22460%22%20y%3D%22155%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFE9A8%22%2F%3E%3Crect%20x%3D%22474%22%20y%3D%22163%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23FFD27A%22%2F%3E%3C%2Fsvg%3E"), url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2280%22%20height%3D%2280%22%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2240%22%20r%3D%2222%22%20fill%3D%22%23F4E9C8%22%2F%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2234%22%20r%3D%2220%22%20fill%3D%22%23141a36%22%2F%3E%3C%2Fsvg%3E"), url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22600%22%20height%3D%22260%22%20shape-rendering%3D%22crispEdges%22%3E%3Crect%20x%3D%22104%22%20y%3D%2226%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22152%22%20y%3D%22127%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22523%22%20y%3D%22161%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22438%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22562%22%20y%3D%22104%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22420%22%20y%3D%22230%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22293%22%20y%3D%22248%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22130%22%20y%3D%2287%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22351%22%20y%3D%22144%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22266%22%20y%3D%22207%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22494%22%20y%3D%22201%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22165%22%20y%3D%2238%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22509%22%20y%3D%22112%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22460%22%20y%3D%22218%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22197%22%20y%3D%22124%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22350%22%20y%3D%2246%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22377%22%20y%3D%22132%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22422%22%20y%3D%22196%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22536%22%20y%3D%22107%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22346%22%20y%3D%2231%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22588%22%20y%3D%22184%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22515%22%20y%3D%22110%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22254%22%20y%3D%22196%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22456%22%20y%3D%22221%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22130%22%20y%3D%2216%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22484%22%20y%3D%22250%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22400%22%20y%3D%22239%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22111%22%20y%3D%22114%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22534%22%20y%3D%2255%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22564%22%20y%3D%2220%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22238%22%20y%3D%2219%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22257%22%20y%3D%22223%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%2272%22%20y%3D%22153%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22267%22%20y%3D%22114%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22550%22%20y%3D%22154%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22323%22%20y%3D%22124%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22240%22%20y%3D%22126%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22314%22%20y%3D%2228%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22510%22%20y%3D%22215%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22233%22%20y%3D%22217%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3C%2Fsvg%3E"), linear-gradient(180deg, #0f1430 0%, #1e2552 70%, #2b2f5e 100%);
+    background-repeat: repeat-x, no-repeat, repeat, no-repeat; background-position: left bottom, right 8% top 26px, 0 0, 0 0;
+    background-size: 480px 170px, 80px 80px, 600px 260px, 100% 100%; background-attachment: local, local, local, local; }
+  #main.bg-station { background-color: #0b0f22;
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22260%22%20height%3D%22260%22%3E%3Cdefs%3E%3CradialGradient%20id%3D%22g%22%20cx%3D%2235%25%22%20cy%3D%2235%25%22%20r%3D%2270%25%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%237FB2FF%22%2F%3E%3Cstop%20offset%3D%22.6%22%20stop-color%3D%22%233B5BA8%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%231B2550%22%2F%3E%3C%2FradialGradient%3E%3C%2Fdefs%3E%3Ccircle%20cx%3D%22130%22%20cy%3D%22130%22%20r%3D%2290%22%20fill%3D%22url%28%23g%29%22%2F%3E%3Cellipse%20cx%3D%22130%22%20cy%3D%22136%22%20rx%3D%22128%22%20ry%3D%2226%22%20fill%3D%22none%22%20stroke%3D%22%23C9D6FF%22%20stroke-opacity%3D%22.45%22%20stroke-width%3D%225%22%2F%3E%3Cpath%20d%3D%22M60%20118%20q30%20-8%2060%204%20t70%20-6%22%20fill%3D%22none%22%20stroke%3D%22%239EC2FF%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%226%22%2F%3E%3C%2Fsvg%3E"), url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22600%22%20height%3D%22260%22%20shape-rendering%3D%22crispEdges%22%3E%3Crect%20x%3D%22104%22%20y%3D%2226%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22152%22%20y%3D%22127%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22523%22%20y%3D%22161%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22438%22%20y%3D%2214%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22562%22%20y%3D%22104%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22420%22%20y%3D%22230%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22293%22%20y%3D%22248%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22130%22%20y%3D%2287%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22351%22%20y%3D%22144%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22266%22%20y%3D%22207%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22494%22%20y%3D%22201%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22165%22%20y%3D%2238%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22509%22%20y%3D%22112%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22460%22%20y%3D%22218%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22197%22%20y%3D%22124%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22350%22%20y%3D%2246%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22377%22%20y%3D%22132%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22422%22%20y%3D%22196%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22536%22%20y%3D%22107%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22346%22%20y%3D%2231%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22588%22%20y%3D%22184%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22515%22%20y%3D%22110%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22254%22%20y%3D%22196%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22456%22%20y%3D%22221%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22130%22%20y%3D%2216%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22484%22%20y%3D%22250%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22400%22%20y%3D%22239%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22111%22%20y%3D%22114%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22534%22%20y%3D%2255%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22564%22%20y%3D%2220%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22238%22%20y%3D%2219%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22257%22%20y%3D%22223%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%2272%22%20y%3D%22153%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22267%22%20y%3D%22114%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22550%22%20y%3D%22154%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22323%22%20y%3D%22124%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%2F%3E%3Crect%20x%3D%22240%22%20y%3D%22126%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22314%22%20y%3D%2228%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%22510%22%20y%3D%22215%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.6%22%2F%3E%3Crect%20x%3D%22233%22%20y%3D%22217%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.4%22%2F%3E%3C%2Fsvg%3E"),
+      linear-gradient(transparent 0 calc(100% - 120px), rgba(120,160,255,.10) calc(100% - 120px)),
+      repeating-linear-gradient(90deg, rgba(140,170,255,.12) 0 1px, transparent 1px 56px),
+      linear-gradient(180deg, #070a18 0%, #121a3a 100%);
+    background-repeat: no-repeat, repeat, no-repeat, repeat-x, no-repeat; background-position: right -40px top 30px, 0 0, 0 0, 0 bottom, 0 0;
+    background-size: 260px 260px, 600px 260px, 100% 100%, 56px 120px, 100% 100%; background-attachment: local; }
+  #main.bg-meadow { background-color: #bfe3f5;
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2296%22%20height%3D%2240%22%20shape-rendering%3D%22crispEdges%22%3E%3Crect%20y%3D%2216%22%20width%3D%2296%22%20height%3D%2224%22%20fill%3D%22%235fae58%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%2212%22%20width%3D%224%22%20height%3D%226%22%20fill%3D%22%235fae58%22%2F%3E%3Crect%20x%3D%228%22%20y%3D%2214%22%20width%3D%224%22%20height%3D%224%22%20fill%3D%22%235fae58%22%2F%3E%3Crect%20x%3D%2216%22%20y%3D%2214%22%20width%3D%224%22%20height%3D%224%22%20fill%3D%22%235fae58%22%2F%3E%3Crect%20x%3D%2224%22%20y%3D%2212%22%20width%3D%224%22%20height%3D%222%22%20fill%3D%22%235fae58%22%2F%3E%3Crect%20x%3D%2232%22%20y%3D%2212%22%20width%3D%224%22%20height%3D%226%22%20fill%3D%22%235fae58%22%2F%3E%3Crect%20x%3D%2240%22%20y%3D%2210%22%20width%3D%224%22%20height%3D%224%22%20fill%3D%22%235fae58%22%2F%3E%3Crect%20x%3D%2248%22%20y%3D%2214%22%20width%3D%224%22%20height%3D%222%22%20fill%3D%22%235fae58%22%2F%3E%3Crect%20x%3D%2256%22%20y%3D%2210%22%20width%3D%224%22%20height%3D%226%22%20fill%3D%22%235fae58%22%2F%3E%3Crect%20x%3D%2264%22%20y%3D%2212%22%20width%3D%224%22%20height%3D%226%22%20fill%3D%22%235fae58%22%2F%3E%3Crect%20x%3D%2272%22%20y%3D%2212%22%20width%3D%224%22%20height%3D%226%22%20fill%3D%22%235fae58%22%2F%3E%3Crect%20x%3D%2280%22%20y%3D%2210%22%20width%3D%224%22%20height%3D%224%22%20fill%3D%22%235fae58%22%2F%3E%3Crect%20x%3D%2288%22%20y%3D%2210%22%20width%3D%224%22%20height%3D%224%22%20fill%3D%22%235fae58%22%2F%3E%3Crect%20x%3D%2239%22%20y%3D%2221%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23ffffff%22%2F%3E%3Crect%20x%3D%2265%22%20y%3D%2229%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23F2C14E%22%2F%3E%3Crect%20x%3D%2230%22%20y%3D%2227%22%20width%3D%223%22%20height%3D%223%22%20fill%3D%22%23F49AC1%22%2F%3E%3C%2Fsvg%3E"), url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22900%22%20height%3D%22220%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M0%20120%20Q150%2060%20300%20110%20T600%20100%20T900%20110%20V220%20H0Z%22%20fill%3D%22%239fd49a%22%2F%3E%3Cpath%20d%3D%22M0%20160%20Q200%20110%20420%20150%20T900%20140%20V220%20H0Z%22%20fill%3D%22%237cc178%22%2F%3E%3C%2Fsvg%3E"), url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22520%22%20height%3D%22160%22%20shape-rendering%3D%22crispEdges%22%3E%3Cg%20fill%3D%22%23ffffff%22%20opacity%3D%22.9%22%3E%3Crect%20x%3D%2240%22%20y%3D%2230%22%20width%3D%2256%22%20height%3D%2210%22%2F%3E%3Crect%20x%3D%2230%22%20y%3D%2240%22%20width%3D%2280%22%20height%3D%2210%22%2F%3E%3Crect%20x%3D%22300%22%20y%3D%2270%22%20width%3D%2244%22%20height%3D%228%22%2F%3E%3Crect%20x%3D%22290%22%20y%3D%2278%22%20width%3D%2270%22%20height%3D%228%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E"), url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22120%22%3E%3Ccircle%20cx%3D%2260%22%20cy%3D%2260%22%20r%3D%2226%22%20fill%3D%22%23FFE08A%22%2F%3E%3Ccircle%20cx%3D%2260%22%20cy%3D%2260%22%20r%3D%2240%22%20fill%3D%22%23FFE08A%22%20opacity%3D%22.25%22%2F%3E%3C%2Fsvg%3E"), linear-gradient(180deg, #8fd0f0 0%, #d8f0fa 70%);
+    background-repeat: repeat-x, repeat-x, repeat, no-repeat, no-repeat;
+    background-position: left bottom, left bottom 24px, 0 0, right 10% top 18px, 0 0;
+    background-size: 96px 40px, 900px 220px, 520px 160px, 120px 120px, 100% 100%; background-attachment: local; }
 </style>
 </head>
 <body>
 <header>
-  <h1>CrewMon <span>Crew Monitor</span></h1>
-  <input id="q" type="search" placeholder="Filter  ( / )">
-  <label><input id="live" type="checkbox"> running only</label>
-  <span class="seg" title="How the crew is laid out"><button id="lgrp" class="on">Grouped</button><button id="lfree">Free</button></span>
-  <label title="Critter">🤖 <select id="style"><option value="bot">Bot</option><option value="blob">Blob</option><option value="bug">Bug</option></select></label>
-  <label title="Background">🎨 <select id="bg">
-    <option value="plain">Plain</option><option value="dots">Dots</option><option value="blueprint">Blueprint</option>
-    <option value="stars">Starfield</option><option value="meadow">Meadow</option></select></label>
-  <span id="count" style="color:var(--muted)"></span>
+  <div class="brand" id="brand">CrewMon</div>
+  <div class="search"><span id="searchico"></span><input id="q" type="search" placeholder="Filter agents  ( / )" aria-label="Filter agents"></div>
+  <div id="summary" aria-label="Crew summary"></div>
+  <span class="spacer"></span>
   <span id="keeper" class="pill" title="The keeper keeps chats running on the machine when VS Code closes them"></span>
   <span id="messenger" class="pill" title="The messenger delivers messages directly and brings the replies back"></span>
-  <a id="helpbtn" style="cursor:pointer;color:var(--vscode-textLink-foreground)">keys (?)</a>
-  <div class="legend" id="legend"></div>
+  <button id="viewbtn" class="ghost" aria-haspopup="true" aria-expanded="false">View</button>
+  <span id="count" hidden></span>
 </header>
-<div id="main"><div id="groups"></div><div id="free" style="display:none"></div><div id="empty">No sessions in the selected period.</div></div>
+<div id="view" class="pop" hidden>
+  <span class="k">Show</span><label style="color:var(--fg)"><input id="live" type="checkbox"> running agents only</label>
+  <span class="k">Layout</span><span class="seg"><button id="lgrp" class="on">Grouped</button><button id="lfree">Free</button></span>
+  <span class="k">Critter</span><select id="style"><option value="bot">Bot</option><option value="blob">Blob</option><option value="bug">Bug</option></select>
+  <span class="k">Scene</span><select id="bg"><option value="city">Night city</option><option value="station">Space station</option><option value="meadow">Meadow</option>
+    <option value="stars">Starfield</option><option value="blueprint">Blueprint</option><option value="dots">Dots</option><option value="plain">Plain</option></select>
+  <span class="k">Colours</span><div class="legend" id="legend"></div>
+  <span class="k">Keys</span><a id="helpbtn" style="cursor:pointer;color:var(--vscode-textLink-foreground)">Show shortcuts (?)</a>
+</div>
+<div id="main"><div id="groups"></div><div id="free" style="display:none"></div><div id="empty"><b>No agents here yet.</b><br>Start a Claude Code chat and it appears on the map, or change the filter.</div></div>
 <div id="dock"></div>
 <div id="panel">
-  <div class="top">
-    <span class="who" id="pwho"></span><span class="what" id="pwhat"></span>
+  <div class="pcard">
+    <div id="pav"></div>
+    <div class="pmain"><div class="who" id="pwho"></div><div class="what" id="pwhat"></div><div id="pmeta"></div></div>
     <div class="actions" id="pactions"></div>
   </div>
-  <div class="msg"><input id="pmsg" type="text" placeholder="Message this agent…  (Enter)"><button id="psend">Send</button></div>
+  <div class="msg"><input id="pmsg" type="text" placeholder="Message this agent…  (Enter)" aria-label="Message"><button id="psend">Send</button></div>
   <div id="chips"></div>
   <div class="note" id="pnote"></div>
 </div>
@@ -186,6 +284,25 @@ if (typeof Critters === 'undefined') {   // critters.js not loaded: plain circle
     ({ busy: '#D97757', idle: '#4CAF7A', machine: '#5B8DEF', offline: '#8A8F98' }[o.state] || '#8A8F98') + '"/></svg>' };
 }
 const $ = (id) => document.getElementById(id);
+// simple line icons, drawn for CrewMon (16x16 grid)
+const ICONS = {
+  open: '<path d="M9 3h4v4"/><path d="M13 3 7.5 8.5"/><path d="M11 9.5V13H3V5h3.5"/>',
+  rename: '<path d="M10.5 2.5 13.5 5.5 6 13H3v-3z"/><path d="M9 4l3 3"/>',
+  note: '<path d="M4 2h6l3 3v9H4z"/><path d="M10 2v3h3"/><path d="M6 8h5M6 10.5h5"/>',
+  keep: '<circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="2.2"/><path d="M8 2.5v3.3M8 10.2v3.3M2.5 8h3.3M10.2 8h3.3"/>',
+  stop: '<rect x="4" y="4" width="8" height="8" rx="1.5"/>',
+  copy: '<rect x="5" y="5" width="8" height="8" rx="1.5"/><path d="M3 10.5V3.5A.5.5 0 0 1 3.5 3H10"/>',
+  trash: '<path d="M3 4.5h10"/><path d="M6.5 4.5V3h3v1.5"/><path d="M4.5 4.5 5 13h6l.5-8.5"/>',
+  folder: '<path d="M2 4.5h4l1.5 1.5H14v6.5H2z"/>',
+  plus: '<path d="M8 3v10M3 8h10"/>',
+  undo: '<path d="M5 6H10a3 3 0 0 1 0 6H6"/><path d="M7 3.5 4.5 6 7 8.5"/>',
+  send: '<path d="M2.5 8 13.5 3l-3 10-2.5-4z"/><path d="M8 9 13.5 3"/>',
+  search: '<circle cx="7" cy="7" r="4"/><path d="m10 10 3.5 3.5"/>',
+  view: '<path d="M2 4h12M2 8h12M2 12h12"/><circle cx="5" cy="4" r="1.2"/><circle cx="11" cy="8" r="1.2"/><circle cx="7" cy="12" r="1.2"/>',
+  reply: '<path d="M3 4h10v7H7l-3 2.5V11H3z"/>',
+  x: '<path d="M4 4l8 8M12 4l-8 8"/>',
+};
+const ic = (n) => '<svg class="ico" viewBox="0 0 16 16" aria-hidden="true">' + (ICONS[n] || '') + '</svg>';
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const base = (p) => (p || '').split('/').filter(Boolean).pop() || '';
 const tilde = (p) => (p || '').replace(/^\/home\/[^/]+/, '~');
@@ -194,11 +311,12 @@ const post = (m) => vscode.postMessage(m);
 let sessions = [], keeper = null, chips = [], replies = {}, messengerOn = false, messengerStatus = 'off', active = [];
 const saved = vscode.getState() || {};
 let layout = saved.layout || 'grouped';
-let bg = saved.bg || 'meadow';
+let bg = saved.bgv === 2 && saved.bg ? saved.bg : 'city';   // the new scenes: start on Night city once
+let stateFilter = '';
 let style = saved.style || '';   // '' = the crewmon.critter setting
 let positions = saved.positions || {};          // free layout: id -> {x, y}
 let selected = new Set(saved.selected || []);
-const persist = () => vscode.setState({ layout, positions, selected: [...selected], bg, style });
+const persist = () => vscode.setState({ layout, positions, selected: [...selected], bg, bgv: 2, style });
 let defaultStyle = 'bot';
 const critterStyle = () => style || defaultStyle;
 function applyBg() { $('main').className = 'bg-' + bg; $('bg').value = bg; }
@@ -274,15 +392,28 @@ function drawArrows() {
 $('main').addEventListener('scroll', () => drawArrows());
 
 // ---------------- map ----------------
+function bucket(s) { return s.needsYou ? 'needs' : s.state === 'busy' ? 'busy' : s.state === 'offline' ? 'asleep' : s.hosts.includes('vscode') ? 'idle' : 'machine'; }
+const rank = { needs: 0, busy: 1, idle: 2, machine: 3, asleep: 4 };
+function renderSummary() {
+  const n = { needs: 0, busy: 0, idle: 0, machine: 0, asleep: 0 };
+  for (const s of sessions) n[bucket(s)]++;
+  const items = [['', sessions.length + ' agents', null], ['needs', n.needs + ' need you', 'var(--alert)'], ['busy', n.busy + ' busy', 'var(--busy)'],
+    ['idle', n.idle + ' idle', 'var(--idle)'], ['machine', n.machine + ' on the machine', 'var(--machine)'], ['asleep', n.asleep + ' asleep', 'var(--offline)']]
+    .filter(([k], i) => i === 0 || n[k] > 0);
+  $('summary').innerHTML = items.map(([k, label, col]) =>
+    '<button class="stat' + (stateFilter === k ? ' on' : '') + (k === 'needs' ? ' alert' : '') + '" data-k="' + k + '" title="' + (k ? 'Show only these' : 'Show all') + '">' +
+    (col ? '<i style="background:' + col + '"></i>' : '') + '<b>' + esc(label.split(' ')[0]) + '</b> ' + esc(label.split(' ').slice(1).join(' ')) + '</button>').join('');
+  $('summary').querySelectorAll('.stat').forEach(b => b.onclick = () => { stateFilter = stateFilter === b.dataset.k ? '' : b.dataset.k; render(); });
+}
 function shown() {
   const q = $('q').value.trim().toLowerCase(), live = $('live').checked;
-  return sessions.filter(s => (!live || s.state !== 'offline') &&
+  return sessions.filter(s => (!live || s.state !== 'offline') && (!stateFilter || bucket(s) === stateFilter) &&
     (!q || (s.title + ' ' + s.id + ' ' + s.startCwd + ' ' + role(s) + ' ' + s.group).toLowerCase().includes(q)));
 }
 function nodeHTML(s) {
   const h = s.ageS / 3600, size = h < 1 ? 64 : h < 24 ? 56 : 48;
   const reply = replies[s.id];
-  const bubble = reply ? '<div class="bubble reply" title="' + esc(reply) + '">💬 ' + esc(reply) + '</div>'
+  const bubble = reply ? '<div class="bubble reply" title="' + esc(reply) + '">' + ic('reply') + esc(reply) + '</div>'
     : s.state === 'busy' && s.activity ? '<div class="bubble" title="' + esc(s.activity) + '">' + esc(s.activity) + '</div>' : '';
   return bubble + (s.needsYou ? '<div class="badge" title="Waiting for you: a question or an approval">!</div>' : '') +
     Critters.critterSVG({ id: s.id, state: stateKey(s), size, style: critterStyle() }) +
@@ -291,7 +422,9 @@ function nodeHTML(s) {
 }
 function makeNode(s) {
   const n = document.createElement('div');
-  n.className = 'node ' + s.state + (selected.has(s.id) ? ' sel' : '');
+  n.className = 'node ' + s.state + (s.needsYou ? ' needs' : '') + (selected.has(s.id) ? ' sel' : '');
+  n.tabIndex = 0;
+  n.addEventListener('keydown', (e) => { if (e.key === ' ') { e.preventDefault(); select(s.id, e.shiftKey); } });
   n.dataset.id = s.id;
   n.innerHTML = nodeHTML(s);
   n.addEventListener('mouseenter', (ev) => { if (!drag) showCard(s, ev); });
@@ -304,6 +437,8 @@ function makeNode(s) {
 function render() {
   const list = shown();
   $('count').textContent = list.length + ' / ' + sessions.length + ' agents';
+  renderSummary();
+  const order = (a, b) => (rank[bucket(a)] - rank[bucket(b)]) || (a.ageS - b.ageS);
   $('empty').style.display = list.length ? 'none' : 'block';
   $('lgrp').classList.toggle('on', layout === 'grouped'); $('lfree').classList.toggle('on', layout === 'free');
   const g = $('groups'), f = $('free');
@@ -315,7 +450,8 @@ function render() {
     const names = Object.keys(groups).sort((a, b) => (byGroup(b) - byGroup(a)) || a.localeCompare(b));
     for (const name of names) {
       const sec = document.createElement('div'); sec.className = 'group';
-      sec.innerHTML = '<h2>' + esc(name) + ' · ' + groups[name].length + '</h2>';
+      sec.innerHTML = '<h2>' + esc(name) + ' <span>' + groups[name].length + (groups[name].length === 1 ? ' agent' : ' agents') + '</span></h2>';
+      groups[name].sort(order);
       const row = document.createElement('div'); row.className = 'row';
       for (const s of groups[name]) row.appendChild(makeNode(s));
       sec.appendChild(row); g.appendChild(sec);
@@ -323,7 +459,7 @@ function render() {
   } else {
     f.innerHTML = '';
     let i = 0, maxY = 0;
-    for (const s of list) {
+    for (const s of [...list].sort(order)) {
       if (!positions[s.id]) positions[s.id] = { x: 24 + (i % 6) * 164, y: 16 + Math.floor(i / 6) * 150 };
       const n = makeNode(s), p = positions[s.id];
       n.style.left = p.x + 'px'; n.style.top = p.y + 'px'; f.appendChild(n);
@@ -383,25 +519,30 @@ function renderPanel() {
   const one = list.length === 1 ? list[0] : null;
   $('pwho').textContent = one ? one.title : list.length + ' agents selected';
   $('pwhat').textContent = one ? (role(one) ? 'In charge of: ' + role(one) : '') : list.map(s => s.title).join(' · ');
+  const av = $('pav');
+  av.className = one ? '' : 'multi';
+  av.innerHTML = (one ? [one] : list.slice(0, 4)).map(s => Critters.critterSVG({ id: s.id, state: stateKey(s), size: one ? 56 : 40, style: critterStyle() })).join('');
+  $('pmeta').textContent = one ? [one.needsYou ? 'needs you' : one.state, where(one), ago(one.ageS), base(one.startCwd)].filter(Boolean).join(' · ') : '';
   const a = $('pactions'); a.innerHTML = '';
-  const btn = (label, title, fn, disabled) => { const b = document.createElement('button'); b.className = 'ghost'; b.textContent = label;
-    b.title = title; b.disabled = !!disabled; b.onclick = fn; a.appendChild(b); };
+  const btn = (icon, label, title, fn, disabled) => { const b = document.createElement('button'); b.className = 'ghost';
+    b.innerHTML = ic(icon) + (label ? '<span>' + esc(label) + '</span>' : ''); b.title = title; b.setAttribute('aria-label', label || title);
+    b.disabled = !!disabled; b.onclick = fn; a.appendChild(b); };
   if (one) {
     const inVS = one.hosts.includes('vscode'), onM = one.hosts.includes('machine');
-    btn('↗ Open', 'Open the chat (double-click, Enter)', () => post({ type: 'open', id: one.id }));
-    btn('✏️ Rename', 'Rename (R)', () => post({ type: 'rename', id: one.id, title: one.title, file: one.file }));
-    btn('📝 Description', 'What it is in charge of (D)', () => post({ type: 'role', id: one.id, title: one.title, desc: role(one) }));
-    if (onM) btn('⏹ Stop machine copy', 'Stop the keeper copy; it can still be resumed', () => post({ type: 'keeper', action: 'end', id: one.id }));
-    else btn(inVS ? (watched(one) ? '🛟 Watched' : '🛟 Keep alive') : '🛟 Keep alive',
+    btn('open', 'Open', 'Open the chat (double-click, Enter)', () => post({ type: 'open', id: one.id }));
+    btn('rename', 'Rename', 'Rename (R)', () => post({ type: 'rename', id: one.id, title: one.title, file: one.file }));
+    btn('note', 'Describe', 'What it is in charge of (D)', () => post({ type: 'role', id: one.id, title: one.title, desc: role(one) }));
+    if (onM) btn('stop', 'Stop copy', 'Stop the keeper copy; it can still be resumed', () => post({ type: 'keeper', action: 'end', id: one.id }));
+    else btn('keep', inVS && watched(one) ? 'Watched' : 'Keep alive',
       inVS ? 'Let the keeper keep it running when VS Code closes it (K)' : 'Run it on the machine now, reachable from the Claude app (K)',
       () => keepAlive(one), inVS && watched(one));
-    btn('📋 Id', 'Copy the session id', () => post({ type: 'copy', text: one.id }));
-    btn('🗑', 'Delete to trash (Del)', () => post({ type: 'keeper', action: 'delete', id: one.id, title: one.title }), inVS);
+    btn('copy', '', 'Copy the session id', () => post({ type: 'copy', text: one.id }));
+    btn('trash', '', inVS ? 'Close it in VS Code before deleting' : 'Delete to trash (Del)', () => post({ type: 'keeper', action: 'delete', id: one.id, title: one.title }), inVS);
   } else {
-    btn('Clear selection', 'Esc', clearSel);
+    btn('x', 'Clear', 'Clear the selection (Esc)', clearSel);
   }
   $('pmsg').placeholder = one ? 'Message ' + one.title.slice(0, 40) + '…  (Enter)' : 'Message all ' + list.length + ' agents…  (Enter)';
-  $('psend').textContent = one ? 'Send' : 'Send to all';
+  $('psend').innerHTML = ic('send') + '<span>' + (one ? 'Send' : 'Send to all') + '</span>';
   $('pnote').textContent = messengerOn ? 'Sent directly by the CrewMon messenger; replies appear over the critter.'
     : one ? 'Opens the chat with your message typed in; press Enter there to send.'
           : 'Opens each chat in turn with your message typed in. Turn on the messenger to send to all directly.';
@@ -428,13 +569,13 @@ $('pmsg').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preven
 function groupNames() { return [...new Set(sessions.map(s => s.group).filter(Boolean))].sort(); }
 function renderDock() {
   const d = $('dock');
-  d.innerHTML = '<span class="title">Drop here:</span>' +
-    '<span class="zone" data-zone="keep" title="Keep it running when VS Code closes it">🛟 Keep alive</span>' +
-    '<span class="zone" data-zone="trash" title="Delete to the keeper trash (asks first)">🗑 Trash</span>' +
-    '<span class="title" style="margin-left:10px">Groups:</span>' +
-    groupNames().map(g => '<span class="zone" data-zone="group" data-group="' + esc(g) + '">📁 ' + esc(g) + '</span>').join('') +
-    '<span class="zone" data-zone="ungroup" title="Back to its folder group">↩ No group</span>' +
-    '<span class="zone add" data-zone="newgroup" title="Drop here, or click, to make a new group">＋ New group</span>';
+  d.innerHTML = '<span class="title">Drag an agent here</span>' +
+    '<span class="zone" data-zone="keep" title="Keep it running when VS Code closes it">' + ic('keep') + 'Keep alive</span>' +
+    '<span class="zone" data-zone="trash" title="Delete to the keeper trash (asks first)">' + ic('trash') + 'Trash</span>' +
+    '<span class="title" style="margin-left:10px">Groups</span>' +
+    groupNames().map(g => '<span class="zone" data-zone="group" data-group="' + esc(g) + '">' + ic('folder') + esc(g) + '</span>').join('') +
+    '<span class="zone" data-zone="ungroup" title="Back to its folder group">' + ic('undo') + 'No group</span>' +
+    '<span class="zone add" data-zone="newgroup" title="Drop here, or click with agents selected, to make a new group">' + ic('plus') + 'New group</span>';
   d.querySelector('[data-zone=newgroup]').onclick = () => { const ids = [...selected]; if (ids.length) post({ type: 'group', ids, group: null }); };
 }
 
@@ -459,7 +600,7 @@ function onMove(ev) {
   if (!drag) return;
   if (!drag.moved && Math.hypot(ev.clientX - drag.x0, ev.clientY - drag.y0) < 6) return;
   if (!drag.moved) {
-    drag.moved = true; hideCard();
+    drag.moved = true; hideCard(); document.body.classList.add('dragging');
     const g = $('ghost'); g.innerHTML = Critters.critterSVG({ id: drag.s.id, state: stateKey(drag.s), size: 44, style: critterStyle() }); g.style.display = 'block';
   }
   const g = $('ghost'); g.style.left = (ev.clientX - 22) + 'px'; g.style.top = (ev.clientY - 22) + 'px';
@@ -469,7 +610,7 @@ function onMove(ev) {
   if (t && t.node) t.node.classList.add('drop');
 }
 function onUp(ev) {
-  const d = drag; drag = null;
+  const d = drag; drag = null; document.body.classList.remove('dragging');
   d.node.removeEventListener('pointermove', onMove);
   $('ghost').style.display = 'none';
   document.querySelectorAll('.zone.hot, .node.drop').forEach(e => e.classList.remove('hot', 'drop'));
@@ -549,7 +690,7 @@ document.addEventListener('keydown', (e) => {
   const list = shown(); const one = sel().length === 1 ? sel()[0] : null;
   if (e.key === '/') { e.preventDefault(); $('q').focus(); return; }
   if (e.key === '?') { $('help').style.display = $('help').style.display === 'block' ? 'none' : 'block'; return; }
-  if (e.key === 'Escape') { $('menu').style.display = 'none'; $('help').style.display = 'none'; clearSel(); return; }
+  if (e.key === 'Escape') { $('menu').style.display = 'none'; $('help').style.display = 'none'; toggleView(false); clearSel(); return; }
   if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
     e.preventDefault();
     const nodes = [...document.querySelectorAll((layout === 'free' ? '#free' : '#groups') + ' .node')];
@@ -584,6 +725,17 @@ document.addEventListener('keydown', (e) => {
 $('helpbtn').onclick = () => { $('help').style.display = $('help').style.display === 'block' ? 'none' : 'block'; };
 $('main').addEventListener('pointerdown', (e) => { if (e.target === $('main') || e.target === $('groups') || e.target === $('free') || e.target.classList.contains('row')) clearSel(); });
 $('bg').addEventListener('change', () => { bg = $('bg').value; persist(); applyBg(); });
+$('brand').innerHTML = Critters.critterSVG({ id: 'crewmon', state: 'busy', size: 26, style: 'bot', accessory: 'none' }) + '<span>CrewMon</span>';
+$('searchico').innerHTML = ic('search');
+$('viewbtn').innerHTML = ic('view') + '<span>View</span>';
+function toggleView(show) {
+  const v = $('view'), b = $('viewbtn');
+  const on = show === undefined ? v.hidden : show;
+  v.hidden = !on; b.setAttribute('aria-expanded', String(on));
+  if (on) { const r = b.getBoundingClientRect(); v.style.top = (r.bottom + 6) + 'px'; v.style.left = Math.max(8, Math.min(r.right - v.offsetWidth, innerWidth - v.offsetWidth - 8)) + 'px'; }
+}
+$('viewbtn').onclick = (e) => { e.stopPropagation(); toggleView(); };
+document.addEventListener('pointerdown', (e) => { if (!$('view').hidden && !$('view').contains(e.target) && e.target !== $('viewbtn') && !$('viewbtn').contains(e.target)) toggleView(false); });
 $('style').addEventListener('change', () => { style = $('style').value; persist(); renderLegend(); render(); });
 applyBg();
 $('lgrp').onclick = () => { layout = 'grouped'; persist(); render(); };
