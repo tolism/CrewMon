@@ -22,7 +22,7 @@ const INBOX = DIR + '/inbox.jsonl'
 const ACTIVE = DIR + '/active.json'
 const BEAT = DIR + '/heartbeat'
 const KEEP_INBOX = 400            // lines kept in the inbox
-const MOD_VERSION = '0.7.3'      // set by build_vsix.py to the extension version
+const MOD_VERSION = '0.7.4'      // set by build_vsix.py to the extension version
 
 type Job = {
   rid: string; kind: string; to?: string; from?: string; a?: string; b?: string; text?: string
@@ -210,6 +210,17 @@ export const register: Register = (on) => {
       } finally { busy = false }
     })
     $.clock.every(4000, () => { void $.fs.write(BEAT, JSON.stringify({ at: Date.now(), version: MOD_VERSION })) })
+    // the names and refs other sessions use (ListAgents), for CrewMon's "Copy ids"
+    const listAgents = async () => {
+      try {
+        const r = await $.tool.call({ tool: 'ListAgents' })
+        await $.fs.write(DIR + '/agents.json', JSON.stringify({ at: Date.now(), result: r }))
+      } catch (err) {
+        await $.fs.write(DIR + '/agents.json', JSON.stringify({ at: Date.now(), error: String((err as Error)?.message ?? err) }))
+      }
+    }
+    void listAgents()
+    $.clock.every(15000, () => { void listAgents() })
     return out
   })
 }

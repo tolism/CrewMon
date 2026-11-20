@@ -187,9 +187,19 @@ function agentNames() {
     try {
       const d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
       if (!d.sessionId || !fs.existsSync('/proc/' + d.pid)) continue;
-      out[d.sessionId] = { name: d.name || '', address: d.messagingSocketPath ? 'uds:' + d.messagingSocketPath : '', status: d.status || '' };
+      out[d.sessionId] = { name: d.name || '', address: d.messagingSocketPath ? 'uds:' + d.messagingSocketPath : '', status: d.status || '', ref: '' };
     } catch (_) { /* skip */ }
   }
+  // refs: from the messenger's last ListAgents (name [ref]); a name listed twice gets no ref (it would be a guess)
+  try {
+    const a = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', 'crewmon', 'messenger', 'agents.json'), 'utf8'));
+    const text = JSON.stringify(a.result || '');
+    const refs = {}, seen = {};
+    for (const m of text.matchAll(/(?:\\n|^|"|This session is )\s*([^\\"\[\]]{1,120}?) \[([0-9a-f]{6})\]/g)) {
+      const name = m[1].trim(); seen[name] = (seen[name] || 0) + 1; refs[name] = m[2];
+    }
+    for (const v of Object.values(out)) if (v.name && seen[v.name] === 1) v.ref = refs[v.name];
+  } catch (_) { /* no list yet */ }
   return out;
 }
 
@@ -265,7 +275,7 @@ function snapshot(days) {
         keeper: k ? (k.status || '') : '',
         role: role[id] || '',
         group: groups[id] || '',
-        agentName: (agents[id] || {}).name || '', agentAddr: (agents[id] || {}).address || '',
+        agentName: (agents[id] || {}).name || '', agentAddr: (agents[id] || {}).address || '', agentRef: (agents[id] || {}).ref || '',
         // needs you: waiting on your answer (AskUserQuestion) or, likely, on a permission prompt (tool call unanswered for 20 s)
         needsYou: r.length > 0 && (c.data.pendingAsk || (!!c.data.pendingTool && ageS > 20)),
       }));

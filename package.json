@@ -2,7 +2,7 @@
   "name": "crewmon",
   "displayName": "CrewMon",
   "description": "CrewMon (Crew Monitor): a live map of your Claude Code agents. Hover for what each one is in charge of, click to open it, keep it running with the keeper.",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "publisher": "tolism",
   "license": "MIT",
   "engines": {

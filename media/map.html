@@ -389,7 +389,9 @@ function where(s) {
 }
 const role = (s) => s.role || s.auto || s.desc || '';
 // what "Copy ids" puts on the clipboard: the session id (for --resume) and the agent name/address (for SendMessage)
-const idsText = (s) => ['session: ' + s.id, 'agent: ' + (s.agentName || '(not running)'), s.agentAddr ? 'address: ' + s.agentAddr : ''].filter(Boolean).join('\n');
+const idsText = (s) => [   // the same shape as the /agent-id skill
+  'Agent name: ' + (s.agentName || '(not running)') + (s.agentRef ? '  (ref ' + s.agentRef + ')' : ''),
+  'Session ID: ' + s.id, s.agentAddr ? 'Address: ' + s.agentAddr : ''].filter(Boolean).join('\n');
 const byId = (id) => sessions.find(s => s.id === id);
 const kinfo = (s) => keeper && keeper.chats ? keeper.chats[s.id] : null;
 const watched = (s) => { const k = kinfo(s) || {}; return !!k.managed || !!(keeper && keeper.mode === 'all'); };
@@ -572,7 +574,7 @@ function showCard(s, ev) {
       (s.branch ? '<span class="k">branch</span><span>' + esc(s.branch) + '</span>' : '') +
       '<span class="k">keeper</span><span>' + esc(keeperLine(s)) + '</span>' +
       '<span class="k">session</span><span>' + esc(s.id) + ' · ' + (s.size / 1e6).toFixed(1) + ' MB</span>' +
-      (s.agentName ? '<span class="k">agent</span><span>' + esc(s.agentName) + '</span>' : '') +
+      (s.agentName ? '<span class="k">agent</span><span>' + esc(s.agentName) + (s.agentRef ? ' [' + esc(s.agentRef) + ']' : '') + '</span>' : '') +
     '</div>';
   c.style.display = 'block'; moveCard(ev);
 }
