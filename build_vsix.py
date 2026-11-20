@@ -14,6 +14,14 @@ FILES = ["package.json", "extension.js", "snapshot.js", "media/map.html", "media
 pkg = json.load(open(os.path.join(ROOT, "package.json")))
 ver, name, pub = pkg["version"], pkg["name"], pkg["publisher"]
 
+# stamp the messenger with this version, so CrewMon can tell an old running messenger from a new one
+import re as _re
+_mod = os.path.join(ROOT, "messenger", "hooks", "register.ts")
+_src = open(_mod).read()
+open(_mod, "w").write(_re.sub(r"const MOD_VERSION = '[^']*'", f"const MOD_VERSION = '{ver}'", _src))
+_pj = os.path.join(ROOT, "messenger", ".claude-plugin", "plugin.json")
+_p = json.load(open(_pj)); _p["version"] = ver; json.dump(_p, open(_pj, "w"), indent=1)
+
 content_types = """<?xml version="1.0" encoding="utf-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
 <Default Extension=".json" ContentType="application/json"/>

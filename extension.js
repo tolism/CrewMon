@@ -33,6 +33,8 @@ let timer = null;
 function cfg(key, dflt) { return vscode.workspace.getConfiguration('crewmon').get(key, dflt); }
 
 let extRoot = '';
+let extVersion = '';
+let lastModCheck = 0;
 const DEFAULT_CHIPS = ['Status?', 'Continue', 'Summarise where you are in 5 lines', 'Stop after this step',
   'Commit your work (no Claude co-author line)', 'What do you need from me?'];
 const HANDOVERS = path.join(os.homedir(), '.claude', 'crewmon', 'handovers');
@@ -43,21 +45,53 @@ const MSG_TMUX = 'crewmon-messenger';
 function tmuxHas(name) {
   return new Promise(r => execFile('tmux', ['has-session', '-t', name], (err) => r(!err)));
 }
+function heartbeat() {   // {at, version}; older messengers wrote only the time
+  try {
+    const t = fs.readFileSync(path.join(MSG_DIR, 'heartbeat'), 'utf8').trim();
+    return t.startsWith('{') ? JSON.parse(t) : { at: Number(t), version: '' };
+  } catch (_) { return null; }
+}
 async function messengerStatus() {
   if (!(await tmuxHas(MSG_TMUX))) return 'off';
-  try { if (Date.now() - Number(fs.readFileSync(path.join(MSG_DIR, 'heartbeat'), 'utf8')) < 15000) return 'on'; } catch (_) { /* none yet */ }
-  return 'starting';
+  const hb = heartbeat();
+  return hb && Date.now() - hb.at < 15000 ? 'on' : 'starting';
 }
-async function startMessenger(root) {
+// The messenger runs from a fixed folder, refreshed from this version of the extension, so an update never leaves it
+// pointing at an old (later deleted) extension folder.
+const MOD_HOME = path.join(os.homedir(), '.claude', 'crewmon', 'messenger-mod');
+function syncMod(root) {
+  const src = path.join(root, 'messenger');
+  for (const rel of ['.claude-plugin/plugin.json', 'hooks/hooks.json', 'hooks/register.ts']) {
+    const to = path.join(MOD_HOME, rel);
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.copyFileSync(path.join(src, rel), to);
+  }
+}
+async function messengerUpToDate(root) {
+  syncMod(root);
+  if ((await messengerStatus()) !== 'on') return;
+  const hb = heartbeat();
+  const mine = extVersion;
+  let busy = [];
+  try { busy = JSON.parse(fs.readFileSync(path.join(MSG_DIR, 'active.json'), 'utf8')); } catch (_) { /* none */ }
+  if (busy.length) return;              // a conversation is in progress: a reply could arrive while it restarts, so wait
+  if (hb && hb.version !== mine) {      // an older messenger is running: restart it on this version (its conversations are kept)
+    await new Promise(r => execFile('tmux', ['kill-session', '-t', MSG_TMUX], () => r()));
+    await startMessenger(root, true);
+    vscode.window.setStatusBarMessage('CrewMon: messenger updated to v' + mine, 6000);
+  }
+}
+async function startMessenger(root, quiet) {
   if (await tmuxHas(MSG_TMUX)) return;
+  syncMod(root);
   const bin = claudeBin();
   if (!bin) { vscode.window.showErrorMessage('CrewMon: no Claude Code binary found to run the messenger.'); return; }
   fs.mkdirSync(MSG_DIR, { recursive: true });
-  const mod = path.join(root, 'messenger');
+  const mod = MOD_HOME;
   const cmd = `exec env $(env | grep -oE "^CLAUDE[A-Z_]*" | sed "s/^/-u /") '${bin}' --plugin-dir '${mod}' --permission-mode auto`;
   execFile('tmux', ['new-session', '-d', '-s', MSG_TMUX, '-c', MSG_DIR, '-x', '200', '-y', '50', cmd], (err) => {
     if (err) vscode.window.showErrorMessage('CrewMon: could not start the messenger: ' + err.message);
-    else vscode.window.showInformationMessage('CrewMon: messenger starting. The first time, Claude asks whether to trust its folder: ' +
+    else if (!quiet) vscode.window.showInformationMessage('CrewMon: messenger starting. The first time, Claude asks whether to trust its folder: ' +
       'run "tmux attach -t crewmon-messenger" in a terminal, choose "Yes, I trust this folder", then press Ctrl+b d.');
   });
 }
@@ -306,8 +340,14 @@ async function push() {
   const k = await runKeeper(extRoot, ['status', '--json']);
   try { data.keeper = k.ok ? JSON.parse(k.out) : null; } catch (_) { data.keeper = null; }
   describeQueue(data.sessions || []);
+  if (Date.now() - lastModCheck > 30000) { lastModCheck = Date.now(); messengerUpToDate(extRoot).catch(() => {}); }
   data.chips = cfg('quickMessages', DEFAULT_CHIPS);
   data.critter = cfg('critter', 'bot');
+  const hbv = heartbeat();
+  let bundledKeeper = '';
+  try { bundledKeeper = require('crypto').createHash('sha1').update(fs.readFileSync(fs.realpathSync(keeperPath(extRoot)))).digest('hex').slice(0, 10); } catch (_) { /* none */ }
+  data.versions = { crewmon: extVersion, messenger: hbv ? hbv.version || 'old' : '',
+    keeperLoop: data.keeper && data.keeper.loop ? data.keeper.loop.code : '', keeperCode: bundledKeeper };
   data.messengerStatus = await messengerStatus();
   data.messenger = data.messengerStatus === 'on';
   lastSessions = data.sessions || [];
@@ -397,6 +437,7 @@ function open(context) {
     }
     else if (m.type === 'convo') { queue({ kind: m.action, rid: m.rid }); setTimeout(push, 1500); }
     else if (m.type === 'opennote') openNote(m.file);
+    else if (m.type === 'restartKeeper') { await runKeeper(extRoot, ['stop']); await runKeeper(extRoot, ['start']); setTimeout(push, 2000); }
     else if (m.type === 'messenger') { if (m.on) await startMessenger(extRoot); else stopMessenger(); setTimeout(push, 1500); }
     else if (m.type === 'copy') { await vscode.env.clipboard.writeText(m.text); vscode.window.setStatusBarMessage('Copied ' + m.text, 2000); }
   });
@@ -406,6 +447,8 @@ function open(context) {
 
 function activate(context) {
   extRoot = context.extensionPath;
+  extVersion = context.extension.packageJSON.version;
+  messengerUpToDate(extRoot).catch(() => {});
   context.subscriptions.push(vscode.commands.registerCommand('crewmon.open', () => open(context)));
   const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
   item.text = '$(organization) Crew';

@@ -56,6 +56,11 @@ LOOP_SESSION = "keeper"
 
 
 # ---------- helpers ----------
+def code_hash():
+    import hashlib
+    with open(os.path.realpath(__file__), "rb") as f:
+        return hashlib.sha1(f.read()).hexdigest()[:10]
+
 def log(msg):
     os.makedirs(DIR, exist_ok=True)
     line = time.strftime("%Y-%m-%d %H:%M:%S ") + msg
@@ -324,6 +329,8 @@ def run():
     except BlockingIOError:
         raise SystemExit("keeper: already running")
     log(f"loop started (pid {os.getpid()})")
+    with open(os.path.join(DIR, "loop.json"), "w") as f:     # which code this loop runs (CrewMon compares it)
+        json.dump({"pid": os.getpid(), "code": code_hash(), "started": time.time()}, f)
     first = True
     while True:
         with state_lock():
@@ -375,6 +382,15 @@ def cmd_status():
         print(f"{r[0]:8}  {r[1]:22}  {r[2]:8}  {r[3]:7}  {r[4][:26]:26}  {r[5]}")
 
 
+def _loop_info(live):
+    try:
+        with open(os.path.join(DIR, "loop.json")) as f:
+            info = json.load(f)
+        return info if LOOP_SESSION in live else None
+    except (OSError, ValueError):
+        return None
+
+
 def cmd_status_json():
     """Machine-readable status for Agent Map."""
     s = load()
@@ -385,6 +401,7 @@ def cmd_status_json():
                         "onMachine": tname(cid) in live, "managed": managed(s, cid)}
                   for cid, c in s["chats"].items()},
         "trash": sorted(os.path.basename(d) for d in glob.glob(os.path.join(TRASH, "*"))),
+        "code": code_hash(), "loop": _loop_info(live),
     }))
 
 

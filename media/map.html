@@ -80,6 +80,9 @@
   .actpop .ev.open .sum { display: none; }
   .cstrip { margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--busy); }
   .cstrip b { font-weight: 600; }
+  #ver { position: fixed; right: 12px; bottom: 6px; z-index: 6; font-size: 10.5px; color: var(--muted); background: color-mix(in srgb, var(--bg) 80%, transparent);
+    border: 1px solid var(--room-line); border-radius: 999px; padding: 1px 9px; display: flex; gap: 8px; align-items: center; }
+  #ver .warn { color: var(--busy); } #ver a { color: var(--vscode-textLink-foreground); cursor: pointer; }
   #arrowpills { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 5; pointer-events: none; }
   .arrowpill { position: absolute; transform: translateX(-50%); white-space: nowrap; font-size: 11px; font-weight: 600; color: #fff;
     background: var(--busy); border-radius: 999px; padding: 1px 8px; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
@@ -312,6 +315,7 @@
   <div class="note">{NOTE} becomes the note's file, {A} and {B} the two agents' names.</div>
   <div class="bar"><button class="ghost" id="hcancel">Cancel</button><button id="hstart">Start hand-over</button></div>
 </div>
+<div id="ver" title="Versions of CrewMon, the messenger and the keeper loop"></div>
 <div id="card"></div>
 <div id="menu" class="menu"></div>
 <div id="ghost"></div>
@@ -403,6 +407,13 @@ function renderKeeper() {
   $('kss').onclick = () => post({ type: 'keeper', action: keeper.running ? 'stop' : 'start' });
 }
 
+function renderVersions(v) {
+  const parts = ['CrewMon v' + esc(v.crewmon || '?')];
+  if (v.messenger) parts.push(v.messenger === v.crewmon ? 'messenger v' + esc(v.messenger) : '<span class="warn" title="An older messenger is running; it is restarted on the new version automatically">messenger v' + esc(v.messenger) + ' (updating)</span>');
+  if (v.keeperLoop) parts.push(v.keeperLoop === v.keeperCode ? 'keeper ✓' : '<span class="warn" title="The keeper loop runs older code than the installed keeper">keeper outdated</span> <a id="krst">restart keeper</a>');
+  $('ver').innerHTML = parts.join(' · ');
+  const k = $('krst'); if (k) k.onclick = () => post({ type: 'restartKeeper' });
+}
 function renderMessenger() {
   const el = $('messenger');
   const label = { on: '<span class="on">● messenger on</span>', starting: '<span class="off">● messenger starting…</span>', off: '<span class="off">● messenger off</span>' }[messengerStatus];
@@ -912,6 +923,7 @@ window.addEventListener('message', (e) => {
     $('style').value = critterStyle();
     replies = m.data.replies || {}; messengerOn = !!m.data.messenger; messengerStatus = m.data.messengerStatus || 'off'; active = m.data.active || [];
     activity = m.data.activity || []; if (!$('act').hidden) renderActivity();
+    renderVersions(m.data.versions || {});
     for (const id of [...selected]) if (!byId(id)) selected.delete(id);
     if (drag) return;   // do not redraw under the pointer while dragging
     try { renderKeeper(); renderMessenger(); render(); drawArrows(); }

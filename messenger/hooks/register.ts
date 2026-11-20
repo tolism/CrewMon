@@ -22,6 +22,7 @@ const INBOX = DIR + '/inbox.jsonl'
 const ACTIVE = DIR + '/active.json'
 const BEAT = DIR + '/heartbeat'
 const KEEP_INBOX = 400            // lines kept in the inbox
+const MOD_VERSION = '0.7.2'      // set by build_vsix.py to the extension version
 
 type Job = {
   rid: string; kind: string; to?: string; from?: string; a?: string; b?: string; text?: string
@@ -208,7 +209,7 @@ export const register: Register = (on) => {
         }
       } finally { busy = false }
     })
-    $.clock.every(4000, () => { void $.fs.write(BEAT, String(Date.now())) })
+    $.clock.every(4000, () => { void $.fs.write(BEAT, JSON.stringify({ at: Date.now(), version: MOD_VERSION })) })
     return out
   })
 }
