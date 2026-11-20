@@ -137,6 +137,20 @@ function readInbox() {
   try { lines = fs.readFileSync(path.join(MSG_DIR, 'inbox.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch (_) { /* none yet */ }
   for (const x of lines) {
     if (x.kind === 'reply' && x.session && now - x.at < 30 * 60e3) replies[x.session] = (x.text || '').slice(0, 300);
+    if (x.at > inboxSeen && x.kind === 'drive-uploaded') {
+      let d = {}; try { d = JSON.parse(x.text); } catch (_) { /* */ }
+      const pick = pickupText(d.title, d.url);
+      vscode.window.showInformationMessage(`CrewMon: uploaded to Google Drive: "${d.title}".`, 'Copy pickup message', 'Open in Drive')
+        .then(p => { if (p === 'Open in Drive') vscode.env.openExternal(vscode.Uri.parse(d.url)); else if (p) { vscode.env.clipboard.writeText(pick); vscode.window.setStatusBarMessage('CrewMon: pickup message copied', 4000); } });
+    }
+    if (x.at > inboxSeen && x.kind === 'drive-read' && pickups[x.rid]) {
+      let d = {}; try { d = JSON.parse(x.text); } catch (_) { /* */ }
+      const p = pickups[x.rid]; delete pickups[x.rid];
+      const local = path.join(os.homedir(), '.claude', 'crewmon', 'handovers', 'drive-' + d.id + '.md');
+      const msg = `Read the hand-over note at ${local} (from Google Drive: "${p.title}") and continue from it. First reply with 2-3 lines on what you are taking over and what you will do next.`;
+      sendMessage({ ids: [p.to], text: msg });
+      queue({ kind: 'drive-mark', id: p.id, text: 'Picked up by "' + p.toTitle + '" on ' + new Date().toISOString().slice(0, 16).replace('T', ' ') });
+    }
     if (x.at > inboxSeen && (x.kind === 'reply' || x.kind === 'error')) {
       const s = lastSessions.find(y => y.id === x.session);
       const who = s ? s.title : (x.session || 'an agent').slice(0, 8);
@@ -152,7 +166,7 @@ function readInbox() {
   let out = [];
   try { out = fs.readFileSync(path.join(MSG_DIR, 'outbox.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch (_) { /* none */ }
   const title = (id) => { const s = lastSessions.find(y => y.id === id); return s ? s.title : (id ? id.slice(0, 8) : ''); };
-  const activity = lines.filter(x => ['sent', 'resent', 'reply', 'error', 'done', 'cancelled', 'note-ready'].includes(x.kind)).map(x => {
+  const activity = lines.filter(x => ['sent', 'resent', 'reply', 'error', 'done', 'cancelled', 'note-ready', 'drive-uploaded', 'drive-marked'].includes(x.kind)).map(x => {
     const req = out.find(o => o.rid === x.rid) || {};
     return { at: x.at, rid: x.rid || '', kind: x.kind, convo: req.kind || '', who: title(x.session), text: (x.text || '').slice(0, 4000) };
   }).reverse().slice(0, 80);
@@ -161,11 +175,49 @@ function readInbox() {
   for (const x of lines) if (x.kind === 'note-ready' && x.at > noteSeen) {
     noteSeen = x.at;
     const a = active.find(y => y.rid === x.rid);
-    vscode.window.showInformationMessage(`CrewMon: the hand-over note from "${title(x.session)}" is ready.`, 'Read the note', 'Send to ' + (a ? a.bTitle.slice(0, 24) : 'B'), 'Cancel hand-over')
-      .then(p => { if (!p) return; if (p === 'Read the note') openNote(x.text); else if (p.startsWith('Send')) queue({ kind: 'approve', rid: x.rid }); else queue({ kind: 'cancel', rid: x.rid }); setTimeout(push, 1500); });
+    const toDrive = a && !a.b;
+    vscode.window.showInformationMessage(`CrewMon: the hand-over note from "${title(x.session)}" is ready.`, 'Read the note',
+      toDrive ? 'Upload to Google Drive' : 'Send to ' + (a ? a.bTitle.slice(0, 24) : 'B'), 'Cancel hand-over')
+      .then(p => { if (!p) return; if (p === 'Read the note') openNote(x.text);
+        else if (p.startsWith('Upload')) driveApprove(x.rid, x.text, title(x.session));
+        else if (p.startsWith('Send')) queue({ kind: 'approve', rid: x.rid }); else queue({ kind: 'cancel', rid: x.rid }); setTimeout(push, 1500); });
   }
   autoResend(active, lines);
-  return { replies, active, activity };
+  let drive = null;
+  try { drive = JSON.parse(fs.readFileSync(path.join(MSG_DIR, 'drive.json'), 'utf8')); } catch (_) { /* not listed yet */ }
+  return { replies, active, activity, drive };
+}
+
+// ---- Google Drive hand-overs ----
+// What to flag before a note leaves the machine (a warning, not a filter: you decide).
+const SENSITIVE = [
+  [/\bPATNO\b|\bparticipant[s]?\b.{0,20}\b\d{4,6}\b|\bsubject[s]?\b.{0,12}\b\d{4,6}\b/i, 'participant ids'],
+  [/\b[a-z]{2}0[123]\d{3}\b/, 'study participant codes'],
+  [/\/home\/[^\s/]+|\/media\/[^\s]+/, 'local file paths'],
+  [/[\w.+-]+@[\w-]+\.[\w.]+/, 'email addresses'],
+  [/\b(?:\d{1,3}\.){3}\d{1,3}\b/, 'IP addresses'],
+  [/(?:password|passwd|secret|token|api[_-]?key)\s*[:=]/i, 'secrets'],
+];
+function sensitiveHits(text) { return SENSITIVE.filter(([re]) => re.test(text)).map(([, label]) => label); }
+function driveBlocked(cwd) { return (cfg('driveBlockedFolders', []) || []).some(f => f && (cwd || '').includes(f)); }
+const pickups = {};     // rid -> { to, toTitle, title, id } while a Drive note is being downloaded for a local agent
+function pickupText(title, url) {
+  return `Open the CrewMon hand-over "${title}" in Google Drive (${url}). Confirm in 3 lines what you are taking over and what you will do next, then continue from it.`;
+}
+// Upload a reviewed note: check it, then tell the messenger to continue the hand-over (which uploads it)
+async function driveApprove(rid, file, fromTitle) {
+  let text = '';
+  try { text = fs.readFileSync(file, 'utf8'); } catch (_) { vscode.window.showWarningMessage('CrewMon: the note is not there yet.'); return; }
+  const hits = sensitiveHits(text);
+  if (hits.length) {
+    const ok = await vscode.window.showWarningMessage(`The note mentions ${hits.join(', ')}. Uploading puts it in your Google Drive, outside this machine.`,
+      { modal: true }, 'Upload anyway', 'Open the note');
+    if (ok === 'Open the note') { openNote(file); return; }
+    if (ok !== 'Upload anyway') return;
+  }
+  const title = 'Hand-over from ' + fromTitle + ' · ' + new Date().toISOString().slice(0, 10);
+  queue({ kind: 'approve', rid, title, description: 'CrewMon hand-over, not picked up yet' });
+  vscode.window.setStatusBarMessage('CrewMon: uploading the note to Google Drive…', 6000);
 }
 
 // Send a message. Without the messenger: open the chat with the text typed in (you press Enter); several -> one after another.
@@ -209,6 +261,14 @@ async function handover(m) {
   fs.mkdirSync(HANDOVERS, { recursive: true });
   const file = path.join(HANDOVERS, `${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '')}-${m.from.slice(0, 8)}-to-${m.to.slice(0, 8)}.md`);
   const fillT = (t) => (t || '').replace(/\{NOTE\}/g, file).replace(/\{A\}/g, m.fromTitle).replace(/\{B\}/g, m.toTitle);
+  if (m.dest === 'drive') {
+    if ((await messengerStatus()) !== 'on') { vscode.window.showErrorMessage('CrewMon: a Google Drive hand-over needs the messenger (start it in the top bar).'); return; }
+    if (driveBlocked(m.fromCwd)) { vscode.window.showErrorMessage('CrewMon: Google Drive hand-overs are turned off for this folder (setting crewmon.driveBlockedFolders).'); return; }
+    queue({ kind: 'handover', dest: 'drive', from: m.from, to: '', fromTitle: m.fromTitle, toTitle: 'someone else (via Google Drive)', file,
+      textA: m.textA || '', approve: true });
+    vscode.window.showInformationMessage(`CrewMon: "${m.fromTitle}" writes the note; you check it before it goes to Google Drive.`);
+    return;
+  }
   if ((await messengerStatus()) === 'on') {
     queue({ kind: 'handover', from: m.from, to: m.to, fromTitle: m.fromTitle, toTitle: m.toTitle, file,
       textA: m.textA || '', textB: m.textB || '', approve: !!m.approve });
@@ -355,6 +415,7 @@ async function push() {
   data.replies = ib.replies;
   data.active = ib.active;
   data.activity = ib.activity;
+  data.drive = ib.drive;
   const slim = Object.assign({}, data, { sessions: (data.sessions || []).map(s => Object.assign({}, s, { summary: undefined })) });
   if (panel) panel.webview.postMessage({ type: 'data', data: slim });
 }
@@ -435,7 +496,13 @@ function open(context) {
       queue({ kind: 'talk', a: m.from, b: m.to, aTitle: m.fromTitle, bTitle: m.toTitle, text: topic.trim(), rounds: Number(r) });
       vscode.window.showInformationMessage('CrewMon: discussion started; replies appear over the critters and A sends a summary at the end.');
     }
+    else if (m.type === 'convo' && m.action === 'approve' && m.drive) { await driveApprove(m.rid, m.file, m.fromTitle); setTimeout(push, 1500); }
     else if (m.type === 'convo') { queue({ kind: m.action, rid: m.rid }); setTimeout(push, 1500); }
+    else if (m.type === 'driveList') { if ((await messengerStatus()) === 'on') queue({ kind: 'drive-list' }); else vscode.window.showWarningMessage('CrewMon: the Drive inbox needs the messenger (start it in the top bar).'); }
+    else if (m.type === 'drivePickup') { const rid = queue({ kind: 'drive-read', id: m.id, title: m.title }); pickups[rid] = { to: m.to, toTitle: m.toTitle, title: m.title, id: m.id };
+      vscode.window.setStatusBarMessage(`CrewMon: fetching "${m.title}" from Google Drive for "${m.toTitle}"…`, 6000); }
+    else if (m.type === 'openUrl') vscode.env.openExternal(vscode.Uri.parse(m.url));
+    else if (m.type === 'copyPickup') { await vscode.env.clipboard.writeText(pickupText(m.title, m.url)); vscode.window.setStatusBarMessage('CrewMon: pickup message copied', 4000); }
     else if (m.type === 'opennote') openNote(m.file);
     else if (m.type === 'restartKeeper') { await runKeeper(extRoot, ['stop']); await runKeeper(extRoot, ['start']); setTimeout(push, 2000); }
     else if (m.type === 'messenger') { if (m.on) await startMessenger(extRoot); else stopMessenger(); setTimeout(push, 1500); }

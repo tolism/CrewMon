@@ -2,7 +2,7 @@
   "name": "crewmon",
   "displayName": "CrewMon",
   "description": "CrewMon (Crew Monitor): a live map of your Claude Code agents. Hover for what each one is in charge of, click to open it, keep it running with the keeper.",
-  "version": "0.7.4",
+  "version": "0.8.0",
   "publisher": "tolism",
   "license": "MIT",
   "engines": {
@@ -81,6 +81,14 @@
             "A round beetle with six little legs"
           ],
           "description": "How the agents are drawn (you can also switch it in the map's top bar)."
+        },
+        "crewmon.driveBlockedFolders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Folders (or parts of a path) whose agents may not hand over through Google Drive, e.g. a project that holds participant data."
         }
       }
     }

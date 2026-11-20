@@ -39,6 +39,9 @@ module.exports = {
     { at: now - 95e3, rid: 'r2', kind: 'sent', convo: 'message', who: 'Payments API v2', text: 'Status?' },
     { at: now - 240e3, rid: 'demo', kind: 'sent', convo: 'handover', who: 'Checkout flow redesign', text: 'Please write a hand-over note for another agent ("Design tokens update") who will continue part of your work. Save it as Markdown to ~/.claude/crewmon/handovers/... Include: the goal; what is done; key decisions and why; where things are; open problems; and the exact next steps.' },
   ],
+  drive: { at: now - 30e3, files: [
+    { id: 'demo1', title: 'Hand-over from Payments API v2 · 2026-11-20', modified: '2026-11-20T09:41:00Z', description: 'CrewMon hand-over, not picked up yet', url: 'https://docs.google.com/document/d/demo1/edit' },
+    { id: 'demo2', title: 'Hand-over from Release notes 2.4 · 2026-11-18', modified: '2026-11-18T16:05:00Z', description: 'Picked up by "Docs search" on 2026-11-19 08:12', url: 'https://docs.google.com/document/d/demo2/edit' } ] },
   messenger: true, messengerStatus: 'on', critter: 'bot',
   active: [{ rid: 'demo', kind: 'handover', a: 'a1f3c9d2-1', b: 'c3a9f7e5-3', waiting: 'a1f3c9d2-1', step: 'note', turn: 0, rounds: 0, sentAt: now - 240e3, aTitle: 'Checkout flow redesign', bTitle: 'Design tokens update', waitingTitle: 'Checkout flow redesign', file: '' }],
 };

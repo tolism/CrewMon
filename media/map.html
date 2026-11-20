@@ -66,6 +66,8 @@
   .dlg .f span { opacity: .8; }
   .dlg textarea, .dlg input[type=text] { font: inherit; font-size: 12.5px; color: var(--inputfg); background: var(--input);
     border: 1px solid var(--vscode-input-border, var(--border)); border-radius: var(--r2); padding: 7px 9px; resize: vertical; }
+  .dlg .dest { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; }
+  .dlg .dest label { display: flex; gap: 6px; align-items: center; }
   .dlg .chk { display: flex; gap: 8px; align-items: center; font-size: 12.5px; }
   .dlg .bar { display: flex; justify-content: flex-end; gap: 8px; }
   .pop.actpop { display: block; width: min(560px, 92vw); max-height: 70vh; overflow: auto; grid-template-columns: none; padding: 12px 14px; }
@@ -276,6 +278,7 @@
   <span class="spacer"></span>
   <span id="keeper" class="pill" title="The keeper keeps chats running on the machine when VS Code closes them"></span>
   <span id="messenger" class="pill" title="The messenger delivers messages directly and brings the replies back"></span>
+  <button id="inboxbtn" class="ghost" aria-haspopup="true" aria-expanded="false" title="Hand-overs waiting in Google Drive">Inbox</button>
   <button id="actbtn" class="ghost" aria-haspopup="true" aria-expanded="false">Activity</button>
   <button id="viewbtn" class="ghost" aria-haspopup="true" aria-expanded="false">View</button>
   <span id="count" hidden></span>
@@ -303,13 +306,17 @@
   <div class="note" id="pnote"></div>
 </div>
 <div id="act" class="pop actpop" hidden></div>
+<div id="inbox" class="pop actpop" hidden></div>
 <div id="hdlg" class="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="hdlgt">
   <h3 id="hdlgt"></h3>
+  <div class="dest"><label><input type="radio" name="hdest" id="hdHere" value="here" checked> <span id="hdHereL">To an agent here</span></label>
+    <label><input type="radio" name="hdest" id="hdDrive" value="drive"> Someone else, through Google Drive</label></div>
+  <div class="note" id="hdDriveNote" hidden>The agent writes the note; you read it, then it is uploaded as a Google Doc to the folder "CrewMon hand-overs" in your Drive. You get its link and a pickup message for whoever continues (another computer, a colleague, claude.ai).</div>
   <label class="f">What should be handed over? <span>(optional, e.g. "only the test fixes")</span>
     <input id="hfocus" type="text" placeholder="everything this agent is working on"></label>
   <label class="f">Instructions for the agent handing over
     <textarea id="htextA" rows="5"></textarea></label>
-  <label class="f">Then, for the agent taking over
+  <label class="f" id="hBwrap">Then, for the agent taking over
     <textarea id="htextB" rows="3"></textarea></label>
   <label class="chk"><input id="happrove" type="checkbox" checked> Let me read the note before it continues</label>
   <div class="note">{NOTE} becomes the note's file, {A} and {B} the two agents' names.</div>
@@ -352,6 +359,8 @@ const ICONS = {
   reply: '<path d="M3 4h10v7H7l-3 2.5V11H3z"/>',
   x: '<path d="M4 4l8 8M12 4l-8 8"/>',
   handover: '<path d="M2 8h9"/><path d="M8 5l3 3-3 3"/><path d="M13.5 3v10"/>',
+  cloud: '<path d="M4.5 12.5h7a3 3 0 0 0 .3-6 4 4 0 0 0-7.6.9A2.6 2.6 0 0 0 4.5 12.5z"/>',
+  inbox: '<path d="M2.5 9 4.5 3.5h7L13.5 9v4h-11z"/><path d="M2.5 9h3l1 1.5h3l1-1.5h3"/>',
   ask: '<path d="M3 4h10v7H7l-3 2.5V11H3z"/><path d="M7 6.5a1.2 1.2 0 1 1 1.6 1.1c-.4.2-.6.4-.6.8"/><path d="M8 9.6v.1"/>',
 };
 const ic = (n) => '<svg class="ico" viewBox="0 0 16 16" aria-hidden="true">' + (ICONS[n] || '') + '</svg>';
@@ -487,7 +496,7 @@ function convoLine(s) {   // this agent's part in a conversation in progress, if
   for (const a of active) {
     const isA = a.a === s.id, isB = a.b === s.id;
     if (!isA && !isB) continue;
-    if (a.kind === 'handover') return a.step === 'review' ? 'note ready: check it' : isA ? 'handing over' : 'taking over';
+    if (a.kind === 'handover') return a.step === 'review' ? 'note ready: check it' : !a.b ? 'handing over (Drive)' : isA ? 'handing over' : 'taking over';
     if (a.kind === 'ask') return isA ? 'asked a question' : 'answering a question';
     if (a.kind === 'talk') return 'talking ' + (a.turn || 1) + '/' + a.rounds;
     return 'messaging';
@@ -626,6 +635,7 @@ function renderPanel() {
       inVS ? 'Let the keeper keep it running when VS Code closes it (K)' : 'Run it on the machine now, reachable from the Claude app (K)',
       () => keepAlive(one), inVS && watched(one));
     btn('handover', 'Hand over…', 'Pass this work to another agent: it writes a note, the other continues', (e) => pickPartner(one, 'handover', e));
+    btn('cloud', 'Via Drive…', 'Hand this work over through Google Drive, to another computer, a colleague or claude.ai', () => openHandover(one, null, true));
     btn('ask', 'Ask…', 'Ask another agent a question for this one (needs the messenger)', (e) => pickPartner(one, 'ask', e), !messengerOn);
     btn('copy', '', 'Copy ids: session id and agent name', () => post({ type: 'copy', text: idsText(one) }));
     btn('trash', '', inVS ? 'Close it in VS Code before deleting' : 'Delete to trash (Del)', () => post({ type: 'keeper', action: 'delete', id: one.id, title: one.title }), inVS);
@@ -760,6 +770,7 @@ function showMenu(s, ev) {
     ['Copy session id only', () => post({ type: 'copy', text: s.id })],
     ['-'],
     ['Hand over to…', () => pickPartner(s, 'handover', ev)],
+    ['Hand over via Google Drive…', () => openHandover(s, null, true), messengerOn ? false : 'Needs the messenger (top bar)'],
     ['Ask another agent…', () => pickPartner(s, 'ask', ev), messengerOn ? false : 'Needs the messenger (top bar)'],
     ['Let it talk with…', () => pickPartner(s, 'talk', ev), messengerOn ? false : 'Needs the messenger (top bar)'],
     ['-'],
@@ -777,12 +788,20 @@ const HA = 'Please write a hand-over note for another agent ("{B}") who will con
   'When it is saved, reply "hand-over ready".';
 const HB = 'Read the hand-over note at {NOTE} from the agent "{A}" and continue from it. First reply with 2-3 lines on what you are taking over and what you will do next.';
 let hpair = null;
-function openHandover(a, b) {
+function setDest(drive) {
+  $('hdDrive').checked = drive; $('hdHere').checked = !drive;
+  $('hBwrap').hidden = drive; $('hdDriveNote').hidden = !drive; $('happrove').parentElement.hidden = drive || !messengerOn;
+  $('hdlgt').textContent = 'Hand over: ' + hpair.a.title + '  →  ' + (drive ? 'Google Drive' : hpair.b ? hpair.b.title : '…');
+  $('hstart').textContent = drive ? 'Start (upload after my check)' : 'Start hand-over';
+}
+$('hdHere').onchange = () => setDest(false);
+$('hdDrive').onchange = () => setDest(true);
+function openHandover(a, b, toDrive) {
   hpair = { a, b };
-  $('hdlgt').textContent = 'Hand over: ' + a.title + '  →  ' + b.title;
+  $('hdHere').disabled = !b; $('hdHereL').textContent = b ? 'To "' + b.title + '" here' : 'To an agent here (pick one with Hand over…)';
   $('hfocus').value = ''; $('htextA').value = HA; $('htextB').value = HB;
   $('happrove').checked = true; $('happrove').parentElement.hidden = !messengerOn;
-  $('hdlg').hidden = false; $('hfocus').focus();
+  $('hdlg').hidden = false; setDest(!!toDrive || !b); $('hfocus').focus();
 }
 $('hcancel').onclick = () => { $('hdlg').hidden = true; };
 $('hstart').onclick = () => {
@@ -790,7 +809,8 @@ $('hstart').onclick = () => {
   const focus = $('hfocus').value.trim();
   let textA = $('htextA').value.trim(), textB = $('htextB').value.trim();
   if (focus) { textA += ' Hand over only this part: ' + focus + '.'; textB += ' You are taking over: ' + focus + '.'; }
-  post({ type: 'handover', from: hpair.a.id, to: hpair.b.id, fromTitle: hpair.a.title, toTitle: hpair.b.title, textA, textB, approve: $('happrove').checked });
+  if ($('hdDrive').checked) post({ type: 'handover', dest: 'drive', from: hpair.a.id, fromTitle: hpair.a.title, fromCwd: hpair.a.startCwd, textA });
+  else post({ type: 'handover', from: hpair.a.id, to: hpair.b.id, fromTitle: hpair.a.title, toTitle: hpair.b.title, textA, textB, approve: $('happrove').checked });
   $('hdlg').hidden = true;
 };
 $('hdlg').addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('hdlg').hidden = true; } e.stopPropagation(); });
@@ -798,13 +818,16 @@ $('hdlg').addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('hdlg
 // ---------------- Activity: conversations in progress + every message and reply ----------------
 function convoActions(a) {
   const btns = [['Retry', 'retry', 'Send its last request again (e.g. after the agent restarted)'], ['Cancel', 'cancel', 'End this conversation']];
-  if (a.kind === 'handover' && a.step === 'review') btns.unshift(['Read the note', 'note', ''], ['Send to ' + (a.bTitle || 'B').slice(0, 24), 'approve', 'Tell the other agent to continue from the note']);
+  if (a.kind === 'handover' && a.step === 'review') btns.unshift(['Read the note', 'note', ''], a.b
+    ? ['Send to ' + (a.bTitle || 'B').slice(0, 24), 'approve', 'Tell the other agent to continue from the note']
+    : ['Upload to Google Drive', 'driveup', 'Upload the note as a Google Doc (after a check for sensitive content)']);
   return btns.map(([l, act, t]) => '<button class="ghost" data-rid="' + esc(a.rid) + '" data-act="' + act + '" data-file="' + esc(a.file || '') + '" title="' + esc(t) + '">' + esc(l) + '</button>').join('');
 }
 function wireConvoButtons(root) {
   root.querySelectorAll('button[data-act]').forEach(b => b.onclick = (e) => {
     e.stopPropagation();
     if (b.dataset.act === 'note') post({ type: 'opennote', file: b.dataset.file });
+    else if (b.dataset.act === 'driveup') { const a = active.find(x => x.rid === b.dataset.rid) || {}; post({ type: 'convo', action: 'approve', drive: true, rid: b.dataset.rid, file: b.dataset.file, fromTitle: a.aTitle || '' }); }
     else post({ type: 'convo', action: b.dataset.act === 'retry' ? 'resend' : b.dataset.act, rid: b.dataset.rid });
   });
 }
@@ -817,12 +840,13 @@ function convoText(a) {
 }
 function renderActivity() {
   const el = $('act');
-  const icon = { sent: 'send', resent: 'send', reply: 'reply', error: 'x', done: 'open', cancelled: 'x', 'note-ready': 'note' };
-  const verb = { sent: 'CrewMon → ', resent: 'sent again → ', reply: '', error: 'could not deliver to ', done: 'finished', cancelled: 'cancelled', 'note-ready': 'note ready from ' };
+  const icon = { sent: 'send', resent: 'send', reply: 'reply', error: 'x', done: 'open', cancelled: 'x', 'note-ready': 'note', 'drive-uploaded': 'cloud', 'drive-marked': 'cloud' };
+  const verb = { sent: 'CrewMon → ', resent: 'sent again → ', reply: '', error: 'could not deliver to ', done: 'finished', cancelled: 'cancelled', 'note-ready': 'note ready from ',
+    'drive-uploaded': 'uploaded to Google Drive', 'drive-marked': 'Drive note marked' };
   el.innerHTML = '<h4>In progress</h4>' + (active.length ? active.map(a => '<div class="conv"><div>' + convoText(a) + '</div><div class="row2">' + convoActions(a) + '</div></div>').join('') : '<div class="note" style="margin-bottom:8px">Nothing in progress.</div>') +
     '<h4 style="margin-top:10px">Messages</h4>' + (activity.length ? activity.map(x =>
       '<div class="ev"><span class="t">' + new Date(x.at).toTimeString().slice(0, 5) + '</span>' + ic(icon[x.kind] || 'reply') + ' ' +
-      esc((verb[x.kind] ?? '') + (x.kind === 'done' || x.kind === 'cancelled' ? '' : x.who) + (x.kind === 'reply' ? ' replied' : '')) +
+      esc((verb[x.kind] ?? '') + (['done', 'cancelled', 'drive-uploaded', 'drive-marked'].includes(x.kind) ? '' : x.who) + (x.kind === 'reply' ? ' replied' : '')) +
       (x.text ? '<div class="sum">' + esc(x.text) + '</div><div class="body">' + esc(x.text) + '</div>' : '') + '</div>').join('') : '<div class="note">No messages yet.</div>');
   el.querySelectorAll('.ev').forEach(d => d.onclick = () => d.classList.toggle('open'));
   wireConvoButtons(el);
@@ -836,6 +860,43 @@ function toggleAct(show) {
 $('actbtn').innerHTML = ic('reply') + '<span>Activity</span>';
 $('actbtn').onclick = (e) => { e.stopPropagation(); toggleView(false); toggleAct(); };
 document.addEventListener('pointerdown', (e) => { if (!$('act').hidden && !$('act').contains(e.target) && !$('actbtn').contains(e.target)) toggleAct(false); });
+
+// ---------------- Inbox: hand-overs waiting in Google Drive ----------------
+let drive = null;
+function renderInbox() {
+  const el = $('inbox');
+  const files = (drive && drive.files) || [];
+  const when = drive ? 'checked ' + ago(Math.round((Date.now() - drive.at) / 1000)) : 'checking…';
+  el.innerHTML = '<h4>Hand-overs in Google Drive <span style="text-transform:none;letter-spacing:0;font-weight:400">· ' + esc(when) + '</span></h4>' +
+    (!messengerOn ? '<div class="note">The inbox needs the messenger (top bar).</div>' :
+    files.length ? files.map(f => '<div class="conv"><div><b>' + esc(f.title) + '</b><br><span class="note">' + esc((f.modified || '').slice(0, 16).replace('T', ' ')) +
+      (f.description ? ' · ' + esc(f.description) : '') + '</span></div><div class="row2">' +
+      '<button class="ghost" data-pick="' + esc(f.id) + '" data-title="' + esc(f.title) + '">' + ic('handover') + 'Start with…</button>' +
+      '<button class="ghost" data-open="' + esc(f.url) + '">' + ic('open') + 'Open</button>' +
+      '<button class="ghost" data-copy="' + esc(f.url) + '" data-title="' + esc(f.title) + '">' + ic('copy') + 'Pickup message</button></div></div>').join('')
+    : '<div class="note">No hand-overs in the folder "CrewMon hand-overs" yet.</div>') +
+    '<div class="row2" style="margin-top:6px"><button class="ghost" id="drvRefresh">Refresh</button></div>';
+  el.querySelectorAll('[data-open]').forEach(b => b.onclick = () => post({ type: 'openUrl', url: b.dataset.open }));
+  el.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => post({ type: 'copyPickup', url: b.dataset.copy, title: b.dataset.title }));
+  el.querySelectorAll('[data-pick]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    const items = [['Who continues "' + b.dataset.title.slice(0, 40) + '"?', 'head']];
+    for (const s of sessions.filter(s => s.state !== 'offline').sort((x, y) => x.ageS - y.ageS).slice(0, 20))
+      items.push([s.title.slice(0, 50), () => post({ type: 'drivePickup', id: b.dataset.pick, title: b.dataset.title, to: s.id, toTitle: s.title })]);
+    if (items.length === 1) items.push(['No running agent: open one first', () => {}, 'Double-click an agent to wake it']);
+    openMenu(items, e);
+  });
+  const r = $('drvRefresh'); if (r) r.onclick = () => post({ type: 'driveList' });
+}
+function toggleInbox(show) {
+  const v = $('inbox'), b = $('inboxbtn');
+  const on = show === undefined ? v.hidden : show;
+  v.hidden = !on; b.setAttribute('aria-expanded', String(on));
+  if (on) { post({ type: 'driveList' }); renderInbox(); const r = b.getBoundingClientRect(); v.style.top = (r.bottom + 6) + 'px'; v.style.left = Math.max(8, Math.min(r.left, innerWidth - v.offsetWidth - 8)) + 'px'; }
+}
+$('inboxbtn').innerHTML = ic('inbox') + '<span>Inbox</span>';
+$('inboxbtn').onclick = (e) => { e.stopPropagation(); toggleView(false); toggleAct(false); toggleInbox(); };
+document.addEventListener('pointerdown', (e) => { if (!$('inbox').hidden && !$('inbox').contains(e.target) && !$('inboxbtn').contains(e.target) && !$('menu').contains(e.target)) toggleInbox(false); });
 
 function pickPartner(a, kind, ev) {
   const others = sessions.filter(s => s.id !== a.id).sort((x, y) => (rank[bucket(x)] - rank[bucket(y)]) || (x.ageS - y.ageS));
@@ -867,7 +928,7 @@ document.addEventListener('keydown', (e) => {
   const list = shown(); const one = sel().length === 1 ? sel()[0] : null;
   if (e.key === '/') { e.preventDefault(); $('q').focus(); return; }
   if (e.key === '?') { $('help').style.display = $('help').style.display === 'block' ? 'none' : 'block'; return; }
-  if (e.key === 'Escape') { $('menu').style.display = 'none'; $('help').style.display = 'none'; toggleView(false); toggleAct(false); clearSel(); return; }
+  if (e.key === 'Escape') { $('menu').style.display = 'none'; $('help').style.display = 'none'; toggleView(false); toggleAct(false); toggleInbox(false); clearSel(); return; }
   if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
     e.preventDefault();
     const nodes = [...document.querySelectorAll((layout === 'free' ? '#free' : '#groups') + ' .node')];
@@ -929,6 +990,7 @@ window.addEventListener('message', (e) => {
     $('style').value = critterStyle();
     replies = m.data.replies || {}; messengerOn = !!m.data.messenger; messengerStatus = m.data.messengerStatus || 'off'; active = m.data.active || [];
     activity = m.data.activity || []; if (!$('act').hidden) renderActivity();
+    drive = m.data.drive || drive; if (!$('inbox').hidden) renderInbox();
     renderVersions(m.data.versions || {});
     for (const id of [...selected]) if (!byId(id)) selected.delete(id);
     if (drag) return;   // do not redraw under the pointer while dragging

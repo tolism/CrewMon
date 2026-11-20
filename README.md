@@ -136,6 +136,23 @@ what was delivered and every reply (`tail -f` it to watch live).
 Claude Code delivers a message from another session straight away only when both use the same kind of permission
 mode; otherwise it holds the message for your approval in that chat.
 
+## Hand-overs through Google Drive
+
+Hand work over to an agent that is not on this machine: another computer, a colleague's Claude, a claude.ai or Claude
+app chat. It needs the messenger, and uses the Google Drive connector of your Claude account (nothing else to sign in).
+
+1. **Send**: agent card → **Via Drive…** (or right-click → *Hand over via Google Drive…*, or choose *Someone else,
+   through Google Drive* in the hand-over window). The agent writes its note; you get **Read the note** and **Upload to
+   Google Drive**. Before uploading, CrewMon checks the note for participant ids, study codes, local paths, email and IP
+   addresses and secrets, and asks again if it finds any. The note becomes a Google Doc in the folder
+   **CrewMon hand-overs** (created the first time), and you get its link and a **pickup message** to paste anywhere.
+2. **Pick up**: the **Inbox** (top bar) lists the hand-overs in that folder. **Start with…** gives one to a running agent
+   here: CrewMon downloads it, tells the agent to continue, and marks the Doc "Picked up by …". **Open** and **Pickup
+   message** are there too.
+
+The folder is private to your Drive until you share it. Turn Drive hand-overs off for projects with sensitive data with
+`crewmon.driveBlockedFolders` (parts of a folder path, e.g. `["AI_PROG_PD_risk_modeling"]`).
+
 ## The keeper: agents that stay alive
 
 `keeper` keeps chats usable from the Claude app when VS Code closes them. When a watched chat stops running in VS Code,
@@ -155,6 +172,7 @@ back.
 | `crewmon.refreshSeconds` | 5 | how often the map refreshes |
 | `crewmon.aiDescriptions` | true | write the one-line *In charge of* with a small model (Haiku), once per summary |
 | `crewmon.quickMessages` | 6 chips | the one-click messages under the message bar |
+| `crewmon.driveBlockedFolders` | `[]` | folders whose agents may not hand over through Google Drive |
 | `crewmon.critter` | `bot` | how agents are drawn: `bot`, `blob` or `bug` (also in the top bar) |
 
 ## Privacy and safety

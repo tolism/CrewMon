@@ -9,7 +9,12 @@
 //                                         A writes a note; with approve, CrewMon shows it before B is told
 //     { rid, kind: 'resend' }   send the last request of conversation rid again (its agent restarted)
 //     { rid, kind: 'cancel' }   end conversation rid
-//     { rid, kind: 'approve' }  the note was checked: tell B to continue
+//     { rid, kind: 'approve' }  the note was checked: tell B to continue (or, for a Drive hand-over, upload it)
+//   Google Drive (through the account's Google Drive connector; folder "CrewMon hand-overs"):
+//     { rid, kind: 'drive-upload', file, title, description }   upload a note as a Google Doc
+//     { rid, kind: 'drive-list' }                               list the folder -> drive.json
+//     { rid, kind: 'drive-read', id, title }                    download a note -> handovers/drive-<id>.md
+//     { rid, kind: 'drive-mark', id, text }                     set the Doc's description ("picked up by ...")
 //   inbox.jsonl   (here -> CrewMon)  { at, rid, kind: 'sent'|'reply'|'error'|'done'|'resent'|'cancelled'|'note-ready', session?, text? }
 //   active.json   the conversations in progress (arrows and Retry/Cancel on the map)
 //   heartbeat     touched every few seconds while this runs
@@ -22,12 +27,12 @@ const INBOX = DIR + '/inbox.jsonl'
 const ACTIVE = DIR + '/active.json'
 const BEAT = DIR + '/heartbeat'
 const KEEP_INBOX = 400            // lines kept in the inbox
-const MOD_VERSION = '0.7.4'      // set by build_vsix.py to the extension version
+const MOD_VERSION = '0.8.0'      // set by build_vsix.py to the extension version
 
 type Job = {
   rid: string; kind: string; to?: string; from?: string; a?: string; b?: string; text?: string
   fromTitle?: string; toTitle?: string; aTitle?: string; bTitle?: string; file?: string
-  textA?: string; textB?: string; approve?: boolean
+  textA?: string; textB?: string; approve?: boolean; dest?: string; description?: string; id?: string; title?: string
   rounds?: number; turn?: number; waiting?: string; step?: string; transcript?: string[]
   lastTo?: string; lastText?: string; sentAt?: number
 }
@@ -77,8 +82,66 @@ function tools($: any) {
     }
   }
 
+  // ---- Google Drive ----
+  const DRIVE = 'claude.ai Google Drive', FOLDER = 'CrewMon hand-overs'
+  const parse = (r: { content?: { type: string; text?: string }[]; isError?: boolean }) => {
+    const text = (r.content ?? []).filter(b => b.type === 'text').map(b => b.text ?? '').join('\n')
+    try { return JSON.parse(text) } catch { return { text } }
+  }
+  const folderId = async (): Promise<string> => {
+    const saved = (await $.store.get('driveFolder')) as string | undefined
+    if (saved) return saved
+    const found = parse(await $.mcp.call(DRIVE, 'search_files', {
+      query: `title = '${FOLDER}' and mimeType = 'application/vnd.google-apps.folder' and owner = 'me' and trashed = false`,
+      excludeContentSnippets: true, pageSize: 5 }))
+    const files = found.files ?? found.items ?? []
+    let id = files[0]?.id
+    if (!id) {
+      const made = parse(await $.mcp.call(DRIVE, 'create_file', { title: FOLDER, contentMimeType: 'application/vnd.google-apps.folder' }))
+      id = made.id
+    }
+    if (!id) throw new Error('could not find or create the Drive folder "' + FOLDER + '"')
+    await $.store.set('driveFolder', id)
+    return id
+  }
+  const docUrl = (f: { id?: string; webViewLink?: string; alternateLink?: string; url?: string }) =>
+    f.webViewLink ?? f.alternateLink ?? f.url ?? (f.id ? 'https://docs.google.com/document/d/' + f.id + '/edit' : '')
+  const drive = async (req: Job) => {
+    try {
+      if (req.kind === 'drive-upload') {
+        const text = String(await $.fs.read(req.file!))
+        const made = parse(await $.mcp.call(DRIVE, 'create_file', {
+          title: req.title, textContent: text, contentMimeType: 'text/markdown', parentId: await folderId() }))
+        if (!made.id) throw new Error('Drive did not return a file id: ' + JSON.stringify(made).slice(0, 300))
+        if (req.description) await $.mcp.call(DRIVE, 'update_file', { fileId: made.id, description: req.description })
+        await log({ rid: req.rid, kind: 'drive-uploaded', text: JSON.stringify({ id: made.id, title: req.title, url: docUrl(made) }) })
+      } else if (req.kind === 'drive-list') {
+        const res = parse(await $.mcp.call(DRIVE, 'search_files', {
+          query: `parentId = '${await folderId()}' and trashed = false`, orderBy: 'modifiedTime desc', pageSize: 50,
+          excludeContentSnippets: true, includeRichMetadata: true }))
+        const files = (res.files ?? res.items ?? []).map((f: Record<string, unknown>) => ({
+          id: f.id, title: f.title ?? f.name, modified: f.modifiedTime ?? f.modified_time ?? '', description: f.description ?? '',
+          owner: f.owner_name ?? '', url: docUrl(f as { id?: string }) }))
+        await $.fs.write(DIR + '/drive.json', JSON.stringify({ at: Date.now(), files }))
+        await log({ rid: req.rid, kind: 'drive-listed', text: String(files.length) })
+      } else if (req.kind === 'drive-read') {
+        const res = parse(await $.mcp.call(DRIVE, 'read_file_content', { fileId: req.id }))
+        const body = res.content ?? res.text ?? JSON.stringify(res)
+        const out = '../handovers/drive-' + req.id + '.md'
+        await $.fs.write(out, `<!-- from Google Drive: ${req.title} (${req.id}) -->\n` + String(body))
+        await log({ rid: req.rid, kind: 'drive-read', text: JSON.stringify({ id: req.id, title: req.title, file: out }) })
+      } else if (req.kind === 'drive-mark') {
+        await $.mcp.call(DRIVE, 'update_file', { fileId: req.id, description: req.text })
+        await log({ rid: req.rid, kind: 'drive-marked', text: req.text })
+      }
+    } catch (err) {
+      await log({ rid: req.rid, kind: 'error', text: 'Google Drive: ' + String((err as Error)?.message ?? err) })
+    }
+  }
+
   // a new request from CrewMon
   const start = async (req: Job) => {
+    if (req.kind.startsWith('drive-')) { await drive(req); return }
     const old = jobs[req.rid]
     if (req.kind === 'resend') {
       if (old && old.lastTo && old.lastText) await send(old, old.lastTo, old.lastText, 'resent')
@@ -91,8 +154,14 @@ function tools($: any) {
       if (old) { delete jobs[req.rid]; await log({ rid: req.rid, kind: 'cancelled' }) }
     } else if (req.kind === 'approve') {
       if (old && old.kind === 'handover' && old.step === 'review') {
-        old.step = 'continue'; old.waiting = old.to
-        await send(old, old.to!, fill(old.textB || DEFAULT_B, old))
+        if (old.dest === 'drive') {      // the note goes to Google Drive instead of to an agent here
+          await drive({ rid: old.rid, kind: 'drive-upload', file: old.file, title: req.title || old.title || ('Hand-over from ' + old.fromTitle),
+            description: req.description || old.description || '' } as Job)
+          await log({ rid: old.rid, kind: 'done' }); delete jobs[old.rid]
+        } else {
+          old.step = 'continue'; old.waiting = old.to
+          await send(old, old.to!, fill(old.textB || DEFAULT_B, old))
+        }
       }
     } else if (req.kind === 'message' && req.to) {
       const j = jobs[req.rid] = { ...req, waiting: req.to }
@@ -104,7 +173,7 @@ function tools($: any) {
       const j = jobs[req.rid] = { ...req, turn: 1, waiting: req.a, transcript: [] }
       await send(j, req.a, `CrewMon is starting a short discussion between you and the agent "${req.bTitle}" ` +
         `(${req.rounds} turns each, at most 150 words per turn). Topic: ${req.text}\nGive your opening view.`)
-    } else if (req.kind === 'handover' && req.from && req.to) {
+    } else if (req.kind === 'handover' && req.from && (req.to || req.dest === 'drive')) {
       const j = jobs[req.rid] = { ...req, step: 'note', waiting: req.from }
       await send(j, req.from, fill(req.textA || DEFAULT_A, j))
     }
