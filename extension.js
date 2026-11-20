@@ -76,19 +76,24 @@ function openNote(file) {
 }
 // A request is lost when its agent restarts before answering (VS Code reload, keeper hand-back). Watch the process
 // running the agent each conversation waits for; if it changes and no reply came, send the last request again, once per change.
-const watchPid = {};   // rid -> pid seen
-function autoResend(active) {
+// A request is lost when its agent restarts before answering (VS Code reload, keeper hand-back). Rule: if the
+// process now running the agent a conversation waits for started AFTER the request was last sent, and no reply came,
+// send it again, once per process. Works whenever CrewMon looks, not only if it watched the restart happen.
+const resentFor = {};   // rid -> pid it was resent to
+function autoResend(active, lines) {
   const run = runningSessions();
   for (const a of active) {
     if (!a.waiting) continue;
-    const pids = (run[a.waiting] || []).map(p => p.pid).sort().join(',');
-    if (!pids) continue;                                  // asleep: it gets it when resent after waking (Retry)
-    if (watchPid[a.rid] === undefined) { watchPid[a.rid] = pids; continue; }
-    if (watchPid[a.rid] !== pids) {
-      watchPid[a.rid] = pids;
-      queue({ kind: 'resend', rid: a.rid });
-      vscode.window.setStatusBarMessage(`CrewMon: "${a.waitingTitle}" restarted; its request was sent again`, 6000);
-    }
+    const procs = run[a.waiting] || [];
+    if (!procs.length) continue;                          // asleep: Retry after waking it, or it is resent when it starts
+    const sentAt = Math.max(a.sentAt || 0, ...lines.filter(x => x.rid === a.rid && (x.kind === 'sent' || x.kind === 'resent')).map(x => x.at));
+    const replied = lines.some(x => x.rid === a.rid && x.kind === 'reply' && x.at > sentAt);
+    const newest = procs.reduce((p, q) => (q.start > p.start ? q : p));
+    if (!sentAt || replied || !newest.start || newest.start < sentAt + 2000) continue;
+    if (resentFor[a.rid] === newest.pid) continue;
+    resentFor[a.rid] = newest.pid;
+    queue({ kind: 'resend', rid: a.rid });
+    vscode.window.setStatusBarMessage(`CrewMon: "${a.waitingTitle}" restarted before answering; its request was sent again`, 8000);
   }
 }
 let lastSessions = [];
@@ -125,7 +130,7 @@ function readInbox() {
     vscode.window.showInformationMessage(`CrewMon: the hand-over note from "${title(x.session)}" is ready.`, 'Read the note', 'Send to ' + (a ? a.bTitle.slice(0, 24) : 'B'), 'Cancel hand-over')
       .then(p => { if (!p) return; if (p === 'Read the note') openNote(x.text); else if (p.startsWith('Send')) queue({ kind: 'approve', rid: x.rid }); else queue({ kind: 'cancel', rid: x.rid }); setTimeout(push, 1500); });
   }
-  autoResend(active);
+  autoResend(active, lines);
   return { replies, active, activity };
 }
 

@@ -138,6 +138,16 @@ function ppid(pid) {
   try { const s = fs.readFileSync(`/proc/${pid}/stat`, 'utf8'); return parseInt(s.slice(s.lastIndexOf(')') + 2).split(' ')[1], 10); }
   catch (_) { return 0; }
 }
+// when a process started (ms since the epoch): /proc/<pid>/stat field 22 (clock ticks since boot) + boot time
+let bootMs = null;
+function procStart(pid) {
+  try {
+    if (bootMs === null) bootMs = Number(/btime (\d+)/.exec(fs.readFileSync('/proc/stat', 'utf8'))[1]) * 1000;
+    const st = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+    const ticks = Number(st.slice(st.lastIndexOf(')') + 2).split(' ')[19]);
+    return bootMs + ticks * 10;          // USER_HZ is 100 on Linux
+  } catch (_) { return 0; }
+}
 function isClaude(argv) { return argv.length > 0 && /(^|\/)claude$/.test(argv[0]); }
 
 // {sessionId: [{pid, host}]}  host = 'vscode' | 'machine' (keeper/tmux) | 'terminal'
@@ -158,7 +168,7 @@ function runningSessions() {
     const pj = parent.join(' ');
     const host = pj.includes('.vscode-server') ? 'vscode'
       : (a.includes('--remote-control') && !a.includes('stream-json')) ? 'machine' : 'terminal';
-    (out[id] = out[id] || []).push({ pid: Number(pid), host });
+    (out[id] = out[id] || []).push({ pid: Number(pid), host, start: procStart(pid) });
   }
   return out;
 }
