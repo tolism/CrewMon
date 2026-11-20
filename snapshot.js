@@ -177,6 +177,22 @@ function roles() {
   try { return JSON.parse(fs.readFileSync(ROLES, 'utf8')); } catch (_) { return {}; }
 }
 
+// Agent names as other sessions see them (ListAgents / SendMessage): ~/.claude/sessions/<pid>.json of running sessions
+function agentNames() {
+  const out = {};
+  const dir = path.join(os.homedir(), '.claude', 'sessions');
+  let files = [];
+  try { files = fs.readdirSync(dir).filter(f => f.endsWith('.json')); } catch (_) { return out; }
+  for (const f of files) {
+    try {
+      const d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+      if (!d.sessionId || !fs.existsSync('/proc/' + d.pid)) continue;
+      out[d.sessionId] = { name: d.name || '', address: d.messagingSocketPath ? 'uds:' + d.messagingSocketPath : '', status: d.status || '' };
+    } catch (_) { /* skip */ }
+  }
+  return out;
+}
+
 function keeperState() {
   try { return JSON.parse(fs.readFileSync(KEEPER_STATE, 'utf8')); } catch (_) { return null; }
 }
@@ -215,6 +231,7 @@ function snapshot(days) {
   const running = runningSessions();
   const keeper = keeperState();
   const role = roles();
+  const agents = agentNames();
   let groups = {};
   try { groups = JSON.parse(fs.readFileSync(GROUPS, 'utf8')); } catch (_) { /* none yet */ }
   let auto = {};
@@ -248,6 +265,7 @@ function snapshot(days) {
         keeper: k ? (k.status || '') : '',
         role: role[id] || '',
         group: groups[id] || '',
+        agentName: (agents[id] || {}).name || '', agentAddr: (agents[id] || {}).address || '',
         // needs you: waiting on your answer (AskUserQuestion) or, likely, on a permission prompt (tool call unanswered for 20 s)
         needsYou: r.length > 0 && (c.data.pendingAsk || (!!c.data.pendingTool && ageS > 20)),
       }));

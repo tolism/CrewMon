@@ -439,7 +439,7 @@ function open(context) {
     else if (m.type === 'opennote') openNote(m.file);
     else if (m.type === 'restartKeeper') { await runKeeper(extRoot, ['stop']); await runKeeper(extRoot, ['start']); setTimeout(push, 2000); }
     else if (m.type === 'messenger') { if (m.on) await startMessenger(extRoot); else stopMessenger(); setTimeout(push, 1500); }
-    else if (m.type === 'copy') { await vscode.env.clipboard.writeText(m.text); vscode.window.setStatusBarMessage('Copied ' + m.text, 2000); }
+    else if (m.type === 'copy') { await vscode.env.clipboard.writeText(m.text); vscode.window.setStatusBarMessage('Copied ' + m.text.split('\n').join('  '), 3000); }
   });
   timer = setInterval(push, Math.max(2, cfg('refreshSeconds', 5)) * 1000);
   panel.onDidDispose(() => { clearInterval(timer); timer = null; panel = null; });
