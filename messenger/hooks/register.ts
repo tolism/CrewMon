@@ -9,11 +9,11 @@
 //                                         A writes a note; with approve, CrewMon shows it before B is told
 //     { rid, kind: 'resend' }   send the last request of conversation rid again (its agent restarted)
 //     { rid, kind: 'cancel' }   end conversation rid
-//     { rid, kind: 'approve' }  the note was checked: tell B to continue (or, for a Drive hand-over, upload it)
+//     { rid, kind: 'approve', zip? }  the note was checked: tell B to continue (or, for a Drive hand-over, upload it)
 //   Google Drive (through the account's Google Drive connector; folder "CrewMon hand-overs"):
-//     { rid, kind: 'drive-upload', file, title, description }   upload a note as a Google Doc
+//     { rid, kind: 'drive-upload', file, title, description, zip? }   upload a note as a Google Doc (+ '<title> (files).zip')
 //     { rid, kind: 'drive-list' }                               list the folder -> drive.json
-//     { rid, kind: 'drive-read', id, title }                    download a note -> handovers/drive-<id>.md
+//     { rid, kind: 'drive-read', id?, zipId?, title }           download a note -> handovers/drive-<id>.md, a zip -> .zip.b64
 //     { rid, kind: 'drive-mark', id, text }                     set the Doc's description ("picked up by ...")
 //   inbox.jsonl   (here -> CrewMon)  { at, rid, kind: 'sent'|'reply'|'error'|'done'|'resent'|'cancelled'|'note-ready', session?, text? }
 //   active.json   the conversations in progress (arrows and Retry/Cancel on the map)
@@ -27,12 +27,13 @@ const INBOX = DIR + '/inbox.jsonl'
 const ACTIVE = DIR + '/active.json'
 const BEAT = DIR + '/heartbeat'
 const KEEP_INBOX = 400            // lines kept in the inbox
-const MOD_VERSION = '0.8.0'      // set by build_vsix.py to the extension version
+const MOD_VERSION = '0.9.0'      // set by build_vsix.py to the extension version
 
 type Job = {
   rid: string; kind: string; to?: string; from?: string; a?: string; b?: string; text?: string
   fromTitle?: string; toTitle?: string; aTitle?: string; bTitle?: string; file?: string
   textA?: string; textB?: string; approve?: boolean; dest?: string; description?: string; id?: string; title?: string
+  zip?: string; zipId?: string; zipTitle?: string
   rounds?: number; turn?: number; waiting?: string; step?: string; transcript?: string[]
   lastTo?: string; lastText?: string; sentAt?: number
 }
@@ -86,8 +87,22 @@ function tools($: any) {
   const DRIVE = 'claude.ai Google Drive', FOLDER = 'CrewMon hand-overs'
   const parse = (r: { content?: { type: string; text?: string }[]; isError?: boolean }) => {
     const text = (r.content ?? []).filter(b => b.type === 'text').map(b => b.text ?? '').join('\n')
+    if (r.isError) throw new Error(text.slice(0, 300) || 'the Drive call failed')
     try { return JSON.parse(text) } catch { return { text } }
   }
+  // A downloaded file's bytes, base64: in a resource block (blob), an image/audio block (data), or the JSON text
+  const blobOf = (r: { content?: Record<string, unknown>[]; isError?: boolean }): string => {
+    for (const b of r.content ?? []) {
+      const res = b.resource as { blob?: string } | undefined
+      if (res?.blob) return res.blob
+      if (typeof b.data === 'string' && b.data) return b.data as string
+    }
+    const j = parse(r as { content?: { type: string; text?: string }[]; isError?: boolean })
+    const c = j.content ?? j.base64Content ?? j.data
+    if (typeof c === 'string' && /^[A-Za-z0-9+/=\s]+$/.test(c) && c.length > 8) return c
+    throw new Error('Drive returned no file bytes')
+  }
+  const ZIP_SUFFIX = ' (files).zip'
   const folderId = async (): Promise<string> => {
     const saved = (await $.store.get('driveFolder')) as string | undefined
     if (saved) return saved
@@ -104,32 +119,60 @@ function tools($: any) {
     await $.store.set('driveFolder', id)
     return id
   }
-  const docUrl = (f: { id?: string; webViewLink?: string; alternateLink?: string; url?: string }) =>
-    f.webViewLink ?? f.alternateLink ?? f.url ?? (f.id ? 'https://docs.google.com/document/d/' + f.id + '/edit' : '')
+  const docUrl = (f: { id?: string; viewUrl?: string; webViewLink?: string; alternateLink?: string; url?: string }) =>
+    f.viewUrl ?? f.webViewLink ?? f.alternateLink ?? f.url ?? (f.id ? 'https://docs.google.com/document/d/' + f.id + '/edit' : '')
   const drive = async (req: Job) => {
     try {
       if (req.kind === 'drive-upload') {
-        const text = String(await $.fs.read(req.file!))
+        let text = String(await $.fs.read(req.file!))
+        let zip: { id: string; title: string; url: string } | undefined
+        if (req.zip) {      // the attached files go up first, so the note can link to them
+          const { base64 } = await $.fs.read(req.zip, { as: 'bytes' }) as { base64: string }
+          const zt = req.title + ZIP_SUFFIX
+          const z = parse(await $.mcp.call(DRIVE, 'create_file', { title: zt, base64Content: base64, contentMimeType: 'application/zip',
+            disableConversionToGoogleType: true, parentId: await folderId() }))
+          if (!z.id) throw new Error('Drive did not return an id for the zip: ' + JSON.stringify(z).slice(0, 300))
+          zip = { id: z.id, title: zt, url: docUrl(z) }
+          text = `> **Files for this hand-over:** "${zt}", in the same Google Drive folder (${zip.url}). Download it and unzip it next to your work.\n\n` + text
+        }
         const made = parse(await $.mcp.call(DRIVE, 'create_file', {
           title: req.title, textContent: text, contentMimeType: 'text/markdown', parentId: await folderId() }))
         if (!made.id) throw new Error('Drive did not return a file id: ' + JSON.stringify(made).slice(0, 300))
         if (req.description) await $.mcp.call(DRIVE, 'update_file', { fileId: made.id, description: req.description })
-        await log({ rid: req.rid, kind: 'drive-uploaded', text: JSON.stringify({ id: made.id, title: req.title, url: docUrl(made) }) })
+        await log({ rid: req.rid, kind: 'drive-uploaded', text: JSON.stringify({ id: made.id, title: req.title, url: docUrl(made), zip }) })
       } else if (req.kind === 'drive-list') {
         const res = parse(await $.mcp.call(DRIVE, 'search_files', {
           query: `parentId = '${await folderId()}' and trashed = false`, orderBy: 'modifiedTime desc', pageSize: 50,
           excludeContentSnippets: true, includeRichMetadata: true }))
-        const files = (res.files ?? res.items ?? []).map((f: Record<string, unknown>) => ({
-          id: f.id, title: f.title ?? f.name, modified: f.modifiedTime ?? f.modified_time ?? '', description: f.description ?? '',
-          owner: f.owner_name ?? '', url: docUrl(f as { id?: string }) }))
+        type Entry = { id: string; title: string; modified: string; description: string; owner: string; url: string; size?: number
+          isZip?: boolean; zip?: { id: string; title: string; size: number } }
+        const all: Entry[] = (res.files ?? res.items ?? []).filter((f: Record<string, unknown>) => f.mimeType !== 'application/vnd.google-apps.folder')
+          .map((f: Record<string, unknown>) => ({
+            id: f.id, title: String(f.title ?? f.name ?? ''), modified: String(f.modifiedTime ?? f.modified_time ?? ''), description: String(f.description ?? ''),
+            owner: String(f.owner_name ?? ''), url: docUrl(f as { id?: string }), size: Number(f.fileSize ?? 0),
+            isZip: f.mimeType === 'application/zip' || String(f.title ?? '').toLowerCase().endsWith('.zip') }))
+        const notes = all.filter(f => !f.isZip)
+        const files: Entry[] = [...notes]
+        for (const z of all.filter(f => f.isZip)) {
+          const note = notes.find(n => n.title + ZIP_SUFFIX === z.title)
+          if (note) note.zip = { id: z.id, title: z.title, size: z.size ?? 0 }; else files.push(z)
+        }
+        files.sort((a, b) => b.modified.localeCompare(a.modified))
         await $.fs.write(DIR + '/drive.json', JSON.stringify({ at: Date.now(), files }))
         await log({ rid: req.rid, kind: 'drive-listed', text: String(files.length) })
       } else if (req.kind === 'drive-read') {
-        const res = parse(await $.mcp.call(DRIVE, 'read_file_content', { fileId: req.id }))
-        const body = res.content ?? res.text ?? JSON.stringify(res)
-        const out = '../handovers/drive-' + req.id + '.md'
-        await $.fs.write(out, `<!-- from Google Drive: ${req.title} (${req.id}) -->\n` + String(body))
-        await log({ rid: req.rid, kind: 'drive-read', text: JSON.stringify({ id: req.id, title: req.title, file: out }) })
+        let out = '', zipB64 = ''
+        if (req.id) {       // the note (a Google Doc)
+          const res = parse(await $.mcp.call(DRIVE, 'read_file_content', { fileId: req.id }))
+          const body = res.fileContent ?? res.content ?? res.text ?? JSON.stringify(res)
+          out = '../handovers/drive-' + req.id + '.md'
+          await $.fs.write(out, `<!-- from Google Drive: ${req.title} (${req.id}) -->\n` + String(body))
+        }
+        if (req.zipId) {    // its files: handed to CrewMon as base64 text, which it unzips
+          zipB64 = '../handovers/drive-' + (req.id || req.zipId) + '.zip.b64'
+          await $.fs.write(zipB64, blobOf(await $.mcp.call(DRIVE, 'download_file_content', { fileId: req.zipId })))
+        }
+        await log({ rid: req.rid, kind: 'drive-read', text: JSON.stringify({ id: req.id || req.zipId, title: req.title, file: out, zipB64 }) })
       } else if (req.kind === 'drive-mark') {
         await $.mcp.call(DRIVE, 'update_file', { fileId: req.id, description: req.text })
         await log({ rid: req.rid, kind: 'drive-marked', text: req.text })
@@ -156,7 +199,7 @@ function tools($: any) {
       if (old && old.kind === 'handover' && old.step === 'review') {
         if (old.dest === 'drive') {      // the note goes to Google Drive instead of to an agent here
           await drive({ rid: old.rid, kind: 'drive-upload', file: old.file, title: req.title || old.title || ('Hand-over from ' + old.fromTitle),
-            description: req.description || old.description || '' } as Job)
+            description: req.description || old.description || '', zip: req.zip } as Job)
           await log({ rid: old.rid, kind: 'done' }); delete jobs[old.rid]
         } else {
           old.step = 'continue'; old.waiting = old.to

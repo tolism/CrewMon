@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
-const { execFile } = require('child_process');
+const { execFile, execFileSync } = require('child_process');
 const { snapshot, runningSessions, ROLES, AUTO, GROUPS } = require('./snapshot');
 
 // The keeper (keeps chats running on the machine when VS Code closes them): ~/.local/bin/keeper, else the bundled copy.
@@ -139,17 +139,25 @@ function readInbox() {
     if (x.kind === 'reply' && x.session && now - x.at < 30 * 60e3) replies[x.session] = (x.text || '').slice(0, 300);
     if (x.at > inboxSeen && x.kind === 'drive-uploaded') {
       let d = {}; try { d = JSON.parse(x.text); } catch (_) { /* */ }
-      const pick = pickupText(d.title, d.url);
+      const pick = pickupText(d.title, d.url, d.zip);
       vscode.window.showInformationMessage(`CrewMon: uploaded to Google Drive: "${d.title}".`, 'Copy pickup message', 'Open in Drive')
         .then(p => { if (p === 'Open in Drive') vscode.env.openExternal(vscode.Uri.parse(d.url)); else if (p) { vscode.env.clipboard.writeText(pick); vscode.window.setStatusBarMessage('CrewMon: pickup message copied', 4000); } });
     }
     if (x.at > inboxSeen && x.kind === 'drive-read' && pickups[x.rid]) {
       let d = {}; try { d = JSON.parse(x.text); } catch (_) { /* */ }
       const p = pickups[x.rid]; delete pickups[x.rid];
-      const local = path.join(os.homedir(), '.claude', 'crewmon', 'handovers', 'drive-' + d.id + '.md');
-      const msg = `Read the hand-over note at ${local} (from Google Drive: "${p.title}") and continue from it. First reply with 2-3 lines on what you are taking over and what you will do next.`;
+      const local = path.join(HANDOVERS, 'drive-' + d.id + '.md');
+      let dir = '';
+      if (d.zipB64) {
+        try { dir = unzipPickup(path.join(HANDOVERS, path.basename(d.zipB64)), d.id); }
+        catch (e) { vscode.window.showErrorMessage('CrewMon: could not unzip the files from Google Drive: ' + (e.message || e)); }
+      }
+      const files = dir ? ` Its files are unzipped in ${dir}.` : '';
+      const msg = p.id
+        ? `Read the hand-over note at ${local} (from Google Drive: "${p.title}") and continue from it.${files} First reply with 2-3 lines on what you are taking over and what you will do next.`
+        : `Files from Google Drive ("${p.title}") are unzipped in ${dir || '(the unzip failed)'}. Look at what is there and reply with 2-3 lines on what it holds and how you would use it here.`;
       sendMessage({ ids: [p.to], text: msg });
-      queue({ kind: 'drive-mark', id: p.id, text: 'Picked up by "' + p.toTitle + '" on ' + new Date().toISOString().slice(0, 16).replace('T', ' ') });
+      if (p.id) queue({ kind: 'drive-mark', id: p.id, text: 'Picked up by "' + p.toTitle + '" on ' + new Date().toISOString().slice(0, 16).replace('T', ' ') });
     }
     if (x.at > inboxSeen && (x.kind === 'reply' || x.kind === 'error')) {
       const s = lastSessions.find(y => y.id === x.session);
@@ -201,11 +209,79 @@ const SENSITIVE = [
 function sensitiveHits(text) { return SENSITIVE.filter(([re]) => re.test(text)).map(([, label]) => label); }
 function driveBlocked(cwd) { return (cfg('driveBlockedFolders', []) || []).some(f => f && (cwd || '').includes(f)); }
 const pickups = {};     // rid -> { to, toTitle, title, id } while a Drive note is being downloaded for a local agent
-function pickupText(title, url) {
-  return `Open the CrewMon hand-over "${title}" in Google Drive (${url}). Confirm in 3 lines what you are taking over and what you will do next, then continue from it.`;
+function pickupText(title, url, zip, isZip) {
+  if (isZip) return `Download "${title}" from Google Drive (${url}), unzip it next to your work, and reply with 2-3 lines on what it holds.`;
+  const files = zip ? ` Its files are in "${zip.title}" in the same Google Drive folder: download it and unzip it next to your work.` : '';
+  return `Open the CrewMon hand-over "${title}" in Google Drive (${url}).${files} Confirm in 3 lines what you are taking over and what you will do next, then continue from it.`;
+}
+// ---- Files attached to a Drive hand-over: one zip, built here, checked by you ----
+const ZIP_MAX = 20 * 1024 * 1024;
+const SKIP_DIR = new Set(['.git', 'node_modules', '__pycache__', '.venv', 'venv', '.mypy_cache', '.pytest_cache', '.ipynb_checkpoints', '.claude']);
+const DATA_EXT = /\.(parquet|csv|tsv|pkl|pickle|h5|hdf5|npy|npz|jsonl|feather|arrow|sqlite|db|edf|bin|cwa|gt3x|mat|sav|xlsx?)$/i;
+const SECRET_FILE = /(^|\/)(\.env(\..*)?|.*\.pem|.*\.key|id_(rsa|ed25519)(\.pub)?|credentials.*\.json)$/i;
+function walkPick(paths) {
+  const root = paths.length === 1 ? path.dirname(paths[0]) : paths.reduce((a, b) => { while (!(b + path.sep).startsWith(a + path.sep)) a = path.dirname(a); return a; }, path.dirname(paths[0]));
+  const keep = [], left = [];
+  const walk = (p) => {
+    let st; try { st = fs.lstatSync(p); } catch (_) { return; }
+    const rel = path.relative(root, p);
+    if (st.isSymbolicLink()) { left.push(rel + ' (link)'); return; }
+    if (st.isDirectory()) {
+      if (SKIP_DIR.has(path.basename(p))) { left.push(rel + '/'); return; }
+      for (const n of fs.readdirSync(p).sort()) walk(path.join(p, n));
+    } else if (st.isFile()) {
+      if (DATA_EXT.test(p) || SECRET_FILE.test(rel)) left.push(rel); else keep.push({ rel, size: st.size });
+    }
+  };
+  for (const p of paths) walk(p);
+  return { root, keep, left };
+}
+// A zip fetched from Drive (base64 text from the messenger) -> handovers/drive-<id>-files/
+function unzipPickup(b64file, id) {
+  const zip = b64file.replace(/\.b64$/, '');
+  fs.writeFileSync(zip, Buffer.from(fs.readFileSync(b64file, 'utf8'), 'base64'));
+  const names = execFileSync('unzip', ['-Z1', zip], { encoding: 'utf8' }).split('\n').filter(Boolean);
+  if (names.some(n => n.startsWith('/') || n.split(/[\\/]/).includes('..'))) throw new Error('the zip holds paths outside its folder; not unpacked');
+  const dir = path.join(HANDOVERS, 'drive-' + id + '-files');
+  fs.mkdirSync(dir, { recursive: true });
+  execFileSync('unzip', ['-o', '-q', zip, '-d', dir]);
+  return dir;
+}
+function mb(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+// Ask for files, zip them, show you what goes; returns the zip path, '' for "note only", null for "stop"
+async function attachFiles(rid, cwd) {
+  const pick = await vscode.window.showInformationMessage('Attach files to this hand-over? They go to Google Drive as one zip next to the note.',
+    { modal: true }, 'Upload the note only', 'Attach files or folders…');
+  if (!pick) return null;
+  if (pick === 'Upload the note only') return '';
+  const uris = await vscode.window.showOpenDialog({ canSelectFiles: true, canSelectFolders: true, canSelectMany: true,
+    openLabel: 'Attach', title: 'Files for the hand-over (zipped)', defaultUri: cwd && fs.existsSync(cwd) ? vscode.Uri.file(cwd) : undefined });
+  if (!uris || !uris.length) return null;
+  const paths = uris.map(u => u.fsPath);
+  if (paths.some(p => driveBlocked(p))) { vscode.window.showErrorMessage('CrewMon: one of these is in a folder blocked from Google Drive (setting crewmon.driveBlockedFolders).'); return null; }
+  const { root, keep, left } = walkPick(paths);
+  if (!keep.length) { vscode.window.showErrorMessage('CrewMon: nothing to attach: ' + (left.length ? 'everything picked is data, secrets or caches.' : 'the selection is empty.')); return null; }
+  const raw = keep.reduce((a, f) => a + f.size, 0);
+  if (raw > 10 * ZIP_MAX) { vscode.window.showErrorMessage(`CrewMon: ${mb(raw)} is too much to hand over through Drive (zip limit ${mb(ZIP_MAX)}).`); return null; }
+  const zip = path.join(HANDOVERS, `attach-${rid}.zip`);
+  try { fs.rmSync(zip, { force: true }); } catch (_) { /* fresh */ }
+  try { execFileSync('zip', ['-q', '-X', zip, '-@'], { cwd: root, input: keep.map(f => f.rel).join('\n') }); }
+  catch (e) { vscode.window.showErrorMessage('CrewMon: could not build the zip: ' + (e.message || e)); return null; }
+  const size = fs.statSync(zip).size;
+  if (size > ZIP_MAX) { vscode.window.showErrorMessage(`CrewMon: the zip is ${mb(size)}; the limit for a Drive hand-over is ${mb(ZIP_MAX)}. Pick less.`); return null; }
+  const hits = new Set();
+  for (const f of keep) if (f.size < 300e3 && !/\.(png|jpe?g|gif|pdf|zip|gz|pt|pth|onnx|whl)$/i.test(f.rel)) {
+    try { for (const h of sensitiveHits(fs.readFileSync(path.join(root, f.rel), 'utf8'))) hits.add(h); } catch (_) { /* unreadable */ }
+  }
+  const detail = keep.slice(0, 14).map(f => '• ' + f.rel + '  (' + mb(f.size) + ')').join('\n') + (keep.length > 14 ? `\n…and ${keep.length - 14} more` : '') +
+    (left.length ? `\n\nLeft out (${left.length}): ` + left.slice(0, 6).join(', ') + (left.length > 6 ? ', …' : '') + '\n(data files, secrets, links, .git, caches)' : '') +
+    (hits.size ? '\n\n⚠ The files mention ' + [...hits].join(', ') + '.' : '');
+  const ok = await vscode.window.showWarningMessage(`Upload ${keep.length} file${keep.length > 1 ? 's' : ''} (${mb(size)} zipped) to your Google Drive with the note?`,
+    { modal: true, detail }, 'Upload note + files');
+  return ok ? zip : null;
 }
 // Upload a reviewed note: check it, then tell the messenger to continue the hand-over (which uploads it)
-async function driveApprove(rid, file, fromTitle) {
+async function driveApprove(rid, file, fromTitle, cwd) {
   let text = '';
   try { text = fs.readFileSync(file, 'utf8'); } catch (_) { vscode.window.showWarningMessage('CrewMon: the note is not there yet.'); return; }
   const hits = sensitiveHits(text);
@@ -215,8 +291,16 @@ async function driveApprove(rid, file, fromTitle) {
     if (ok === 'Open the note') { openNote(file); return; }
     if (ok !== 'Upload anyway') return;
   }
+  if (!cwd) {       // where agent A works: the file picker starts there
+    let act = []; try { act = JSON.parse(fs.readFileSync(path.join(MSG_DIR, 'active.json'), 'utf8')); } catch (_) { /* none */ }
+    const j = (Array.isArray(act) ? act : Object.values(act)).find(x => x && x.rid === rid);
+    const s = j && lastSessions.find(y => y.id === j.a);
+    cwd = s ? (s.cwd || s.startCwd) : '';
+  }
+  const zip = await attachFiles(rid, cwd);
+  if (zip === null) return;
   const title = 'Hand-over from ' + fromTitle + ' · ' + new Date().toISOString().slice(0, 10);
-  queue({ kind: 'approve', rid, title, description: 'CrewMon hand-over, not picked up yet' });
+  queue({ kind: 'approve', rid, title, description: 'CrewMon hand-over, not picked up yet', zip: zip || undefined });
   vscode.window.setStatusBarMessage('CrewMon: uploading the note to Google Drive…', 6000);
 }
 
@@ -499,10 +583,10 @@ function open(context) {
     else if (m.type === 'convo' && m.action === 'approve' && m.drive) { await driveApprove(m.rid, m.file, m.fromTitle); setTimeout(push, 1500); }
     else if (m.type === 'convo') { queue({ kind: m.action, rid: m.rid }); setTimeout(push, 1500); }
     else if (m.type === 'driveList') { if ((await messengerStatus()) === 'on') queue({ kind: 'drive-list' }); else vscode.window.showWarningMessage('CrewMon: the Drive inbox needs the messenger (start it in the top bar).'); }
-    else if (m.type === 'drivePickup') { const rid = queue({ kind: 'drive-read', id: m.id, title: m.title }); pickups[rid] = { to: m.to, toTitle: m.toTitle, title: m.title, id: m.id };
+    else if (m.type === 'drivePickup') { const rid = queue({ kind: 'drive-read', id: m.id || undefined, zipId: m.zipId || undefined, title: m.title }); pickups[rid] = { to: m.to, toTitle: m.toTitle, title: m.title, id: m.id };
       vscode.window.setStatusBarMessage(`CrewMon: fetching "${m.title}" from Google Drive for "${m.toTitle}"…`, 6000); }
     else if (m.type === 'openUrl') vscode.env.openExternal(vscode.Uri.parse(m.url));
-    else if (m.type === 'copyPickup') { await vscode.env.clipboard.writeText(pickupText(m.title, m.url)); vscode.window.setStatusBarMessage('CrewMon: pickup message copied', 4000); }
+    else if (m.type === 'copyPickup') { await vscode.env.clipboard.writeText(pickupText(m.title, m.url, m.zipTitle ? { title: m.zipTitle } : null, m.isZip)); vscode.window.setStatusBarMessage('CrewMon: pickup message copied', 4000); }
     else if (m.type === 'opennote') openNote(m.file);
     else if (m.type === 'restartKeeper') { await runKeeper(extRoot, ['stop']); await runKeeper(extRoot, ['start']); setTimeout(push, 2000); }
     else if (m.type === 'messenger') { if (m.on) await startMessenger(extRoot); else stopMessenger(); setTimeout(push, 1500); }

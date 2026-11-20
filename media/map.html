@@ -820,7 +820,7 @@ function convoActions(a) {
   const btns = [['Retry', 'retry', 'Send its last request again (e.g. after the agent restarted)'], ['Cancel', 'cancel', 'End this conversation']];
   if (a.kind === 'handover' && a.step === 'review') btns.unshift(['Read the note', 'note', ''], a.b
     ? ['Send to ' + (a.bTitle || 'B').slice(0, 24), 'approve', 'Tell the other agent to continue from the note']
-    : ['Upload to Google Drive', 'driveup', 'Upload the note as a Google Doc (after a check for sensitive content)']);
+    : ['Upload to Google Drive', 'driveup', 'Upload the note as a Google Doc, with files as a zip if you add any (after a check for sensitive content)']);
   return btns.map(([l, act, t]) => '<button class="ghost" data-rid="' + esc(a.rid) + '" data-act="' + act + '" data-file="' + esc(a.file || '') + '" title="' + esc(t) + '">' + esc(l) + '</button>').join('');
 }
 function wireConvoButtons(root) {
@@ -863,6 +863,7 @@ document.addEventListener('pointerdown', (e) => { if (!$('act').hidden && !$('ac
 
 // ---------------- Inbox: hand-overs waiting in Google Drive ----------------
 let drive = null;
+const kb = (n) => !n ? '?' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
 function renderInbox() {
   const el = $('inbox');
   const files = (drive && drive.files) || [];
@@ -870,19 +871,21 @@ function renderInbox() {
   el.innerHTML = '<h4>Hand-overs in Google Drive <span style="text-transform:none;letter-spacing:0;font-weight:400">· ' + esc(when) + '</span></h4>' +
     (!messengerOn ? '<div class="note">The inbox needs the messenger (top bar).</div>' :
     files.length ? files.map(f => '<div class="conv"><div><b>' + esc(f.title) + '</b><br><span class="note">' + esc((f.modified || '').slice(0, 16).replace('T', ' ')) +
+      (f.isZip ? ' · zip, ' + esc(kb(f.size)) : f.zip ? ' · + files (zip, ' + esc(kb(f.zip.size)) + ')' : '') +
       (f.description ? ' · ' + esc(f.description) : '') + '</span></div><div class="row2">' +
-      '<button class="ghost" data-pick="' + esc(f.id) + '" data-title="' + esc(f.title) + '">' + ic('handover') + 'Start with…</button>' +
+      '<button class="ghost" data-pick="' + esc(f.id) + '" data-title="' + esc(f.title) + '" data-zip="' + esc(f.isZip ? f.id : f.zip ? f.zip.id : '') + '" data-iszip="' + (f.isZip ? 1 : '') + '">' +
+        ic('handover') + (f.isZip ? 'Unzip for…' : 'Start with…') + '</button>' +
       '<button class="ghost" data-open="' + esc(f.url) + '">' + ic('open') + 'Open</button>' +
-      '<button class="ghost" data-copy="' + esc(f.url) + '" data-title="' + esc(f.title) + '">' + ic('copy') + 'Pickup message</button></div></div>').join('')
+      '<button class="ghost" data-copy="' + esc(f.url) + '" data-title="' + esc(f.title) + '" data-ztitle="' + esc(f.zip ? f.zip.title : '') + '" data-iszip="' + (f.isZip ? 1 : '') + '">' + ic('copy') + 'Pickup message</button></div></div>').join('')
     : '<div class="note">No hand-overs in the folder "CrewMon hand-overs" yet.</div>') +
     '<div class="row2" style="margin-top:6px"><button class="ghost" id="drvRefresh">Refresh</button></div>';
   el.querySelectorAll('[data-open]').forEach(b => b.onclick = () => post({ type: 'openUrl', url: b.dataset.open }));
-  el.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => post({ type: 'copyPickup', url: b.dataset.copy, title: b.dataset.title }));
+  el.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => post({ type: 'copyPickup', url: b.dataset.copy, title: b.dataset.title, zipTitle: b.dataset.ztitle || '', isZip: !!b.dataset.iszip }));
   el.querySelectorAll('[data-pick]').forEach(b => b.onclick = (e) => {
     e.stopPropagation();
     const items = [['Who continues "' + b.dataset.title.slice(0, 40) + '"?', 'head']];
     for (const s of sessions.filter(s => s.state !== 'offline').sort((x, y) => x.ageS - y.ageS).slice(0, 20))
-      items.push([s.title.slice(0, 50), () => post({ type: 'drivePickup', id: b.dataset.pick, title: b.dataset.title, to: s.id, toTitle: s.title })]);
+      items.push([s.title.slice(0, 50), () => post({ type: 'drivePickup', id: b.dataset.iszip ? '' : b.dataset.pick, zipId: b.dataset.zip || '', title: b.dataset.title, to: s.id, toTitle: s.title })]);
     if (items.length === 1) items.push(['No running agent: open one first', () => {}, 'Double-click an agent to wake it']);
     openMenu(items, e);
   });
