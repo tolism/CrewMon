@@ -216,6 +216,11 @@ tools/gallery.js    draws the preview sheets: node tools/gallery.js bot > docs/c
 ```
 Edit, run `python3 build_vsix.py`, install the new `.vsix`, and reload the window.
 
+**Before every push**, `tools/check.sh` must pass: the code parses, the messenger validates, the package builds and
+`vsce` accepts it, the map opens in a headless browser with no page errors, and nothing personal (home paths, user and
+host names, the machine's IP, emails, keys) or generated (data files, `dist/`, `node_modules/`) goes up.
+`tools/install-hooks.sh` installs it as a git pre-push hook, so `git push` refuses to push when it fails.
+
 All 11 accessories on the default Bot, in every state:
 
 <p align="center"><img src="docs/critters.png" width="380" alt="All Bot variations: 11 accessories by 4 states"></p>
