@@ -252,6 +252,9 @@
   #split:focus { outline: none; }
   body.resizing { cursor: ns-resize; user-select: none; }
   #split + #panel { border-top: 0; }
+  #split, #panel { z-index: 3; } #panel { position: relative; }
+  #panel.shut { height: 0; min-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; visibility: hidden; box-shadow: none; }
+  body.dragging #split.over, body.dragging #split.over + #panel { visibility: hidden; }   /* the dock's drop zones are under it */
   @media (max-width: 1000px) {
     .pcard { grid-template-columns: auto minmax(0, 1fr); }
     #panel .actions { grid-column: 1 / -1; justify-content: flex-start; }
@@ -629,24 +632,33 @@ function select(id, add) {
 function clearSel() { selected.clear(); persist(); render(); }
 function sel() { return [...selected].map(byId).filter(Boolean); }
 // The divider above the panel: drag it, or focus it and use the up/down keys; double-click = automatic height.
-const PANEL_MIN = 60, MAP_MIN = 60;
-function panelMax() { return Math.max(PANEL_MIN, innerHeight - MAP_MIN - ['header', '#dock', '#split'].reduce((h, q) => h + document.querySelector(q).offsetHeight, 0)); }
+// Dragged up it slides over the dock and the map (a short tab has no other room); dragged down it closes to the bar alone.
+const PANEL_MIN = 60, MAP_MIN = 60, TOP_MIN = 48, SHUT = 1;      // panelH: 0 = automatic, SHUT = closed
+const tall = (q) => document.querySelector(q).offsetHeight;
+function panelRoom() { return innerHeight - MAP_MIN - tall('header') - tall('#dock') - tall('#split'); }   // without covering anything; < 0 in a very short tab
+function panelMax() { return Math.max(PANEL_MIN, innerHeight - TOP_MIN - tall('#split')); }
 function sizePanel() {
-  const max = panelMax(), p = $('panel');
-  p.style.maxHeight = max + 'px';
-  p.style.height = panelH ? Math.min(max, Math.max(PANEL_MIN, panelH)) + 'px' : '';
+  const p = $('panel'), room = panelRoom(), shut = panelH === SHUT;
+  const h = shut ? 0 : panelH ? Math.min(panelMax(), Math.max(PANEL_MIN, panelH)) : 0;
+  const over = Math.max(0, (shut ? 0 : h || Math.min(PANEL_MIN, panelMax())) - room);
+  p.classList.toggle('shut', shut);
+  p.style.height = h ? h + 'px' : '';
+  p.style.maxHeight = (h || Math.max(PANEL_MIN, room)) + 'px';
+  p.style.flexShrink = h ? 0 : '';
+  $('split').style.marginTop = over ? -over + 'px' : '';
+  $('split').classList.toggle('over', over > 0);
 }
-function setPanelH(h) { panelH = h ? Math.round(Math.min(panelMax(), Math.max(PANEL_MIN, h))) : 0; sizePanel(); }
+function setPanelH(h) { panelH = !h ? 0 : h < PANEL_MIN / 2 ? SHUT : Math.round(Math.min(panelMax(), Math.max(PANEL_MIN, h))); sizePanel(); }
 (() => {
   const d = $('split'); let from = null;
   const end = () => { if (!from) return; from = null; document.body.classList.remove('resizing'); persist(); };
   d.addEventListener('pointerdown', (e) => { if (e.button) return; from = { y: e.clientY, h: $('panel').offsetHeight };
     d.setPointerCapture(e.pointerId); document.body.classList.add('resizing'); });
-  d.addEventListener('pointermove', (e) => { if (from && e.clientY !== from.y) setPanelH(from.h + from.y - e.clientY); });
+  d.addEventListener('pointermove', (e) => { if (from && e.clientY !== from.y) setPanelH(Math.max(1, from.h + from.y - e.clientY)); });
   d.addEventListener('pointerup', end); d.addEventListener('pointercancel', end);
   d.addEventListener('dblclick', () => { setPanelH(0); persist(); });
   d.addEventListener('keydown', (e) => { if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-    e.preventDefault(); e.stopPropagation(); setPanelH($('panel').offsetHeight + (e.key === 'ArrowUp' ? 24 : -24)); persist(); });
+    e.preventDefault(); e.stopPropagation(); const h = $('panel').offsetHeight; setPanelH(e.key === 'ArrowUp' ? Math.max(PANEL_MIN, h + 24) : h <= PANEL_MIN ? SHUT : Math.max(PANEL_MIN, h - 24)); persist(); });
   addEventListener('resize', sizePanel);
 })();
 function renderPanel() {
