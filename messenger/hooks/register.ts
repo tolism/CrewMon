@@ -27,7 +27,7 @@ const INBOX = DIR + '/inbox.jsonl'
 const ACTIVE = DIR + '/active.json'
 const BEAT = DIR + '/heartbeat'
 const KEEP_INBOX = 400            // lines kept in the inbox
-const MOD_VERSION = '0.9.2'      // set by build_vsix.py to the extension version
+const MOD_VERSION = '0.9.3'      // set by build_vsix.py to the extension version
 
 type Job = {
   rid: string; kind: string; to?: string; from?: string; a?: string; b?: string; text?: string
@@ -42,6 +42,8 @@ let offset = -1
 let busy = false
 let loaded = false
 let jobs: Record<string, Job> = {}
+let seen: string[] = []           // the last requests started: the same one sent again is ignored
+const KEEP_SEEN = 300
 const tag = (rid: string) => `[CrewMon ${rid}]`
 const replyHint = (rid: string) =>
   `\n\n(Sent through CrewMon. Reply with SendMessage to the sender of this message, and start your reply with ${tag(rid)}.)`
@@ -63,10 +65,10 @@ const bodyOf = (text: string) => text.replace(/^[\s\S]*?\[CrewMon [a-z0-9]+\]\s*
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function tools($: any) {
   const save = async () => {
-    await $.store.set('state', { offset, jobs })
+    await $.store.set('state', { offset, jobs, seen })
     const active = Object.values(jobs).map(j => ({
       rid: j.rid, kind: j.kind, a: j.a ?? j.from, b: j.b ?? j.to, waiting: j.waiting, step: j.step ?? '',
-      turn: j.turn ?? 0, rounds: j.rounds ?? 0, sentAt: j.sentAt ?? 0, file: j.file ?? '',
+      turn: j.turn ?? 0, replied: !!j.replied, rounds: j.rounds ?? 0, sentAt: j.sentAt ?? 0, file: j.file ?? '',
       aTitle: j.aTitle ?? j.fromTitle ?? '', bTitle: j.bTitle ?? j.toTitle ?? '',
     }))
     await $.fs.write(ACTIVE, JSON.stringify(active))
@@ -193,6 +195,10 @@ function tools($: any) {
   const start = async (req: Job) => {
     if (req.kind.startsWith('drive-')) { await drive(req); return }
     const old = jobs[req.rid]
+    if (['message', 'ask', 'talk', 'handover'].includes(req.kind)) {
+      if (old || seen.includes(req.rid)) return
+      seen = [...seen, req.rid].slice(-KEEP_SEEN)
+    }
     if (req.kind === 'resend') {
       if (old && old.lastTo && old.lastText) await send(old, old.lastTo, old.lastText, 'resent')
       else if (old && old.kind === 'handover' && old.step === 'note' && old.from)      // started before resend existed
@@ -202,6 +208,7 @@ function tools($: any) {
       else if (old && old.kind === 'message' && old.to) await send(old, old.to, old.text ?? '', 'resent')
     } else if (req.kind === 'cancel') {
       if (old) { delete jobs[req.rid]; await log({ rid: req.rid, kind: 'cancelled' }) }
+      else if (!seen.includes(req.rid)) { seen = [...seen, req.rid].slice(-KEEP_SEEN); await log({ rid: req.rid, kind: 'cancelled' }) }   // discarded before it started
     } else if (req.kind === 'approve') {
       if (old && old.kind === 'handover' && old.step === 'review') {
         if (old.dest === 'drive') {      // the note goes to Google Drive instead of to an agent here
@@ -300,9 +307,10 @@ function tools($: any) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function load($: any) {
   if (loaded) return
-  const saved = (await $.store.get('state')) as { offset?: number; jobs?: Record<string, Job> } | undefined
+  const saved = (await $.store.get('state')) as { offset?: number; jobs?: Record<string, Job>; seen?: string[] } | undefined
   offset = saved?.offset ?? -1
   jobs = saved?.jobs ?? {}
+  seen = saved?.seen ?? []
   loaded = true
 }
 
@@ -342,9 +350,15 @@ export const register: Register = (on) => {
           if (st.size > offset) {
             const added = String(await $.fs.read(OUTBOX, { offset, length: st.size - offset }))
             offset = st.size
-            for (const line of added.split('\n')) {
-              if (!line.trim()) continue
-              try { await start(JSON.parse(line) as Job) } catch (err) { await log({ kind: 'error', text: 'bad request: ' + String(err) }) }
+            const lines = added.split('\n').filter(l => l.trim())
+            const cancelled = (from: number, rid: string) => lines.slice(from + 1).some(l => {
+              try { const r = JSON.parse(l) as Job; return r.kind === 'cancel' && r.rid === rid } catch { return false } })
+            for (const [i, line] of lines.entries()) {
+              try {
+                const req = JSON.parse(line) as Job
+                if (req.kind !== 'cancel' && cancelled(i, req.rid)) continue      // discarded while this was not running
+                await start(req)
+              } catch (err) { await log({ kind: 'error', text: 'bad request: ' + String(err) }) }
             }
             await save()
           }

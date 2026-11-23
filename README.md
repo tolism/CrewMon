@@ -127,7 +127,8 @@ messenger's folder (`~/.claude/crewmon/messenger`). Run `tmux attach -t crewmon-
 *Yes, I trust this folder*, then press `Ctrl+b` `d` to leave it running. It shows **● messenger on** when ready.
 
 **Activity** (top bar) lists every conversation in progress, with **Retry** and **Cancel**, and every message and
-reply (click one for the full text). If an agent restarts before it answers (a VS Code reload, the keeper handing it
+reply (click one for the full text). If the messenger does not pick a request up within 10 seconds, CrewMon tells you
+and lists it there as *Not picked up yet*. If an agent restarts before it answers (a VS Code reload, the keeper handing it
 back), CrewMon sends its request again by itself.
 
 **Look inside:** `tmux attach -t crewmon-messenger` shows its screen. `~/.claude/crewmon/messenger/inbox.jsonl` lists
@@ -199,6 +200,7 @@ back.
 | The map is empty or the command is missing after an update | **Developer: Reload Window** |
 | "keeper not found" | reload the window; check `keeper status` in a terminal |
 | Messenger stays on "starting…" | `tmux attach -t crewmon-messenger` and accept the folder-trust question |
+| *Not picked up yet* under Activity | the messenger did not take the request: **Send again** (it is never delivered twice) or **Discard**; check that the messenger is on |
 | A message was not delivered | look at `~/.claude/crewmon/messenger/inbox.jsonl` for an `error` line |
 | Rename did nothing | for a chat open in VS Code, CrewMon opens Claude's own *Rename* box; type the name there |
 | No live state (all grey) | Linux: CrewMon needs `/proc`. macOS and Windows: check that `~/.claude/sessions` has a file per running chat |
@@ -210,6 +212,7 @@ back.
 package.json        extension manifest (command, Ctrl+Alt+A, settings)
 extension.js        the VS Code side: the tab, refresh, actions, keeper, messenger, AI descriptions
 processes.js        which chats are running (Linux: /proc; macOS: ps + Claude Code's session files; Windows: session files)
+delivery.js         requests the messenger has not picked up
 snapshot.js         reads the sessions (node snapshot.js prints them in a terminal)
 media/map.html      the map
 media/critters.js   the critters: three styles, 11 accessories, a pose per state
@@ -217,12 +220,14 @@ keeper/keeper       the keeper (Python; state, log and trash in ~/.claude/keeper
 messenger/          the messenger add-on (runs in the background session)
 build_vsix.py       builds dist/crewmon-<version>.vsix
 make_icon.py        draws media/icon.png (needs Pillow)
+tools/test-messenger.mjs  the messenger, tested with everything around it simulated
 tools/screenshot/   the README screenshots: made-up example agents on the real map page, taken with headless Chromium
 tools/gallery.js    draws the preview sheets: node tools/gallery.js bot > docs/critters.svg, … styles > docs/styles.svg
 ```
 Edit, run `python3 build_vsix.py`, install the new `.vsix`, and reload the window.
 
-**Before every push**, `tools/check.sh` must pass: the code parses, the messenger validates, the package builds and
+**Before every push**, `tools/check.sh` must pass (GitHub runs it too, on Linux and macOS): the code parses, the messenger
+validates and passes its tests, the package builds and
 `vsce` accepts it, the map opens in a headless browser with no page errors, and nothing personal (home paths, user and
 host names, the machine's IP, emails, keys) or generated (data files, `dist/`, `node_modules/`) goes up.
 `tools/install-hooks.sh` installs it as a git pre-push hook, so `git push` refuses to push when it fails.

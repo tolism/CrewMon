@@ -11,7 +11,7 @@ bad()  { printf '  \033[31m✘\033[0m %s\n' "$1"; fail=1; }
 step() { printf '\n%s\n' "$1"; }
 
 step "1. Code parses"
-for f in extension.js snapshot.js processes.js media/critters.js tools/gallery.js tools/screenshot/build-demo.js tools/screenshot/shoot.js; do
+for f in extension.js snapshot.js processes.js delivery.js media/critters.js tools/gallery.js tools/screenshot/build-demo.js tools/screenshot/shoot.js; do
   node --check "$f" 2>/dev/null && ok "$f" || bad "$f does not parse"
 done
 python3 - <<'EOF' > /tmp/crewmon-check-map.js || bad "could not extract the map script"
@@ -30,8 +30,15 @@ CLAUDE_BIN=$(node -p "require('./processes').claudeBin() || ''")
 if [ -x "$CLAUDE_BIN" ]; then
   out=$(env $(env | grep -oE '^CLAUDE[A-Z_]*' | sed 's/^/-u /') "$CLAUDE_BIN" plugin validate messenger 2>&1)
   echo "$out" | grep -q "Validation passed" && ! echo "$out" | grep -q "error TS" && ok "claude plugin validate messenger" || { bad "messenger plugin validation failed"; echo "$out" | grep -E "error|✘" | head -5; }
+elif [ -n "${CI:-}" ]; then
+  printf '  - skipped: no Claude Code on this machine (CI)\n'
 else
   bad "no Claude Code binary found to validate the messenger"
+fi
+if node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit(a > 22 || (a === 22 && b >= 6) ? 0 : 1)'; then
+  out=$(node --experimental-strip-types --no-warnings tools/test-messenger.mjs 2>&1) && ok "$out" || { bad "messenger tests failed"; echo "$out" | head -20; }
+else
+  printf '  - skipped: the messenger tests need Node 22.6 or newer (this is %s)\n' "$(node --version)"
 fi
 
 step "3. Package builds"

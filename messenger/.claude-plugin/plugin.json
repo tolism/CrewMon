@@ -1,5 +1,5 @@
 {
  "name": "crewmon-messenger",
- "version": "0.9.2",
+ "version": "0.9.3",
  "description": "CrewMon's messenger: delivers CrewMon messages to other Claude Code sessions and collects their replies."
 }

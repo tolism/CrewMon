@@ -251,10 +251,22 @@
   #split:hover::after, #split:focus-visible::after, body.resizing #split::after { background: var(--accent); opacity: 1; }
   #split:focus { outline: none; }
   body.resizing { cursor: ns-resize; user-select: none; }
+  #actbtn.late { border-color: var(--alert); } #actbtn.late::after { content: attr(data-n); margin-left: 6px; font-weight: 700; color: var(--alert); }
+  .conv.late { border-color: var(--alert); }
+  .pop, #act, #inbox { box-sizing: border-box; max-width: calc(100vw - 16px); }
   #split + #panel { border-top: 0; }
   #split, #panel { z-index: 3; } #panel { position: relative; }
   #panel.shut { height: 0; min-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; visibility: hidden; box-shadow: none; }
   body.dragging #split.over, body.dragging #split.over + #panel { visibility: hidden; }   /* the dock's drop zones are under it */
+  /* narrow tabs: a short top bar (icons and numbers; the words are in the tooltips) */
+  @media (max-width: 900px) {
+    header { gap: 6px; padding: 6px 12px; }
+    header .spacer, #brand span, header > button.ghost span, .stat .w { display: none; }
+    .search { flex: 1 1 120px; } .search input { min-width: 0; width: 100%; }
+    #inboxbtn, #actbtn, #viewbtn { order: 1; padding: 4px 8px; }
+    #summary, header .pill { order: 2; } #summary { gap: 4px; } .stat { padding: 1px 7px; gap: 5px; }
+    header .pill { padding: 1px 8px; gap: 5px; font-size: 11.5px; } header .pill .extra { display: none; }
+  }
   @media (max-width: 1000px) {
     .pcard { grid-template-columns: auto minmax(0, 1fr); }
     #panel .actions { grid-column: 1 / -1; justify-content: flex-start; }
@@ -297,9 +309,9 @@
   <span class="spacer"></span>
   <span id="keeper" class="pill" title="The keeper keeps chats running on the machine when VS Code closes them"></span>
   <span id="messenger" class="pill" title="The messenger delivers messages directly and brings the replies back"></span>
-  <button id="inboxbtn" class="ghost" aria-haspopup="true" aria-expanded="false" title="Hand-overs waiting in Google Drive">Inbox</button>
-  <button id="actbtn" class="ghost" aria-haspopup="true" aria-expanded="false">Activity</button>
-  <button id="viewbtn" class="ghost" aria-haspopup="true" aria-expanded="false">View</button>
+  <button id="inboxbtn" class="ghost" aria-label="Inbox" aria-haspopup="true" aria-expanded="false" title="Hand-overs waiting in Google Drive">Inbox</button>
+  <button id="actbtn" class="ghost" aria-label="Activity" title="Activity" aria-haspopup="true" aria-expanded="false">Activity</button>
+  <button id="viewbtn" class="ghost" aria-label="View" title="View" aria-haspopup="true" aria-expanded="false">View</button>
   <span id="count" hidden></span>
 </header>
 <div id="view" class="pop" hidden>
@@ -389,7 +401,7 @@ const base = (p) => (p || '').split('/').filter(Boolean).pop() || '';
 const tilde = (p) => (p || '').replace(/^\/home\/[^/]+/, '~');
 const post = (m) => vscode.postMessage(m);
 
-let sessions = [], keeper = null, chips = [], replies = {}, messengerOn = false, messengerStatus = 'off', active = [], activity = [];
+let sessions = [], keeper = null, chips = [], replies = {}, messengerOn = false, messengerStatus = 'off', active = [], activity = [], pending = [];
 const saved = vscode.getState() || {};
 let layout = saved.layout || 'grouped';
 let bg = saved.bgv === 2 && saved.bg ? saved.bg : 'city';   // the new scenes: start on Night city once
@@ -437,7 +449,7 @@ function renderKeeper() {
   if (!keeper) { el.innerHTML = '<span class="off">● keeper not found</span>'; return; }
   const n = keeper.mode === 'all' ? 'all VS Code chats' : (keeper.allow || []).length + ' watched';
   el.innerHTML = (keeper.running ? '<span class="on">● keeper running</span>' : '<span class="off">● keeper stopped</span>') +
-    '<span style="color:var(--muted)">' + esc(keeper.mode) + ' · ' + esc(n) + '</span>' + '<a id="kss">' + (keeper.running ? 'stop' : 'start') + '</a>';
+    '<span class="extra" style="color:var(--muted)">' + esc(keeper.mode) + ' · ' + esc(n) + '</span>' + '<a id="kss">' + (keeper.running ? 'stop' : 'start') + '</a>';
   $('kss').onclick = () => post({ type: 'keeper', action: keeper.running ? 'stop' : 'start' });
 }
 
@@ -504,8 +516,8 @@ function renderSummary() {
     ['idle', n.idle + ' idle', 'var(--idle)'], ['machine', n.machine + ' on the machine', 'var(--machine)'], ['asleep', n.asleep + ' asleep', 'var(--offline)']]
     .filter(([k], i) => i === 0 || n[k] > 0);
   $('summary').innerHTML = items.map(([k, label, col]) =>
-    '<button class="stat' + (stateFilter === k ? ' on' : '') + (k === 'needs' ? ' alert' : '') + '" data-k="' + k + '" title="' + (k ? 'Show only these' : 'Show all') + '">' +
-    (col ? '<i style="background:' + col + '"></i>' : '') + '<b>' + esc(label.split(' ')[0]) + '</b> ' + esc(label.split(' ').slice(1).join(' ')) + '</button>').join('');
+    '<button class="stat' + (stateFilter === k ? ' on' : '') + (k === 'needs' ? ' alert' : '') + '" data-k="' + k + '" title="' + esc(label) + ': ' + (k ? 'show only these' : 'show all') + '" aria-label="' + esc(label) + '">' +
+    (col ? '<i style="background:' + col + '"></i>' : '') + '<b>' + esc(label.split(' ')[0]) + '</b> ' + '<span class="w">' + esc(label.split(' ').slice(1).join(' ')) + '</span></button>').join('');
   $('summary').querySelectorAll('.stat').forEach(b => b.onclick = () => { stateFilter = stateFilter === b.dataset.k ? '' : b.dataset.k; render(); });
 }
 function shown() {
@@ -883,9 +895,10 @@ function wireConvoButtons(root) {
     else post({ type: 'convo', action: b.dataset.act === 'retry' ? 'resend' : b.dataset.act, rid: b.dataset.rid });
   });
 }
+const KINDS = { handover: 'Hand-over', ask: 'Question', talk: 'Discussion', message: 'Message' };
 function convoText(a) {
-  const k = { handover: 'Hand-over', ask: 'Question', talk: 'Discussion', message: 'Message' }[a.kind] || a.kind;
-  const step = a.kind === 'handover' ? (a.step === 'note' ? 'writing the note' : a.step === 'review' ? 'note ready for your check' : 'taking over') : a.kind === 'talk' ? 'turn ' + a.turn + '/' + a.rounds : '';
+  const k = KINDS[a.kind] || a.kind;
+  const step = a.kind === 'handover' ? (a.step === 'note' ? (a.replied ? 'answered, note not saved yet' : 'writing the note') : a.step === 'review' ? 'note ready for your check' : 'taking over') : a.kind === 'talk' ? 'turn ' + a.turn + '/' + a.rounds : '';
   const since = a.sentAt ? ' · sent ' + ago(Math.round((Date.now() - a.sentAt) / 1000)) : '';
   return '<b>' + esc(k) + '</b> ' + esc(a.aTitle || '') + (a.bTitle ? ' → ' + esc(a.bTitle) : '') + (step ? ' · ' + esc(step) : '') +
     (a.waiting ? ' · waiting for ' + esc(a.waitingTitle || '') : '') + esc(since);
@@ -895,7 +908,11 @@ function renderActivity() {
   const icon = { sent: 'send', resent: 'send', reply: 'reply', error: 'x', done: 'open', cancelled: 'x', 'note-ready': 'note', 'drive-uploaded': 'cloud', 'drive-marked': 'cloud' };
   const verb = { sent: 'CrewMon → ', resent: 'sent again → ', reply: '', error: 'could not deliver to ', done: 'finished', cancelled: 'cancelled', 'note-ready': 'note ready from ',
     'drive-uploaded': 'uploaded to Google Drive', 'drive-marked': 'Drive note marked' };
-  el.innerHTML = '<h4>In progress</h4>' + (active.length ? active.map(a => '<div class="conv"><div>' + convoText(a) + '</div><div class="row2">' + convoActions(a) + '</div></div>').join('') : '<div class="note" style="margin-bottom:8px">Nothing in progress.</div>') +
+  const late = pending.map(x => '<div class="conv late"><div><b>Not picked up yet</b> ' + esc(KINDS[x.kind] || x.kind) + (x.aTitle ? ' ' + esc(x.aTitle) + ' →' : '') + ' ' + esc(x.bTitle || '') +
+    ' · asked ' + ago(Math.round((Date.now() - x.at) / 1000)) + '</div><div class="note">' + (messengerOn ? 'The messenger has not taken this request.' : 'The messenger is not running: start it in the top bar.') +
+    '</div><div class="row2"><button class="ghost" data-rid="' + esc(x.rid) + '" data-act="again" title="Ask again; it is never delivered twice">Send again</button>' +
+    '<button class="ghost" data-rid="' + esc(x.rid) + '" data-act="cancel" title="Forget this request">Discard</button></div></div>').join('');
+  el.innerHTML = '<h4>In progress</h4>' + late + (active.length ? active.map(a => '<div class="conv"><div>' + convoText(a) + '</div><div class="row2">' + convoActions(a) + '</div></div>').join('') : late ? '' : '<div class="note" style="margin-bottom:8px">Nothing in progress.</div>') +
     '<h4 style="margin-top:10px">Messages</h4>' + (activity.length ? activity.map(x =>
       '<div class="ev"><span class="t">' + new Date(x.at).toTimeString().slice(0, 5) + '</span>' + ic(icon[x.kind] || 'reply') + ' ' +
       esc((verb[x.kind] ?? '') + (['done', 'cancelled', 'drive-uploaded', 'drive-marked'].includes(x.kind) ? '' : x.who) + (x.kind === 'reply' ? ' replied' : '')) +
@@ -908,6 +925,10 @@ function toggleAct(show) {
   const on = show === undefined ? v.hidden : show;
   v.hidden = !on; b.setAttribute('aria-expanded', String(on));
   if (on) { renderActivity(); const r = b.getBoundingClientRect(); v.style.top = (r.bottom + 6) + 'px'; v.style.left = Math.max(8, Math.min(r.right - v.offsetWidth, innerWidth - v.offsetWidth - 8)) + 'px'; }
+}
+function renderLate() {   // the Activity button shows how many requests were not picked up
+  const b = $('actbtn'); b.classList.toggle('late', pending.length > 0);
+  b.dataset.n = pending.length || ''; b.title = pending.length ? pending.length + ' not picked up by the messenger' : 'Activity'; b.setAttribute('aria-label', b.title);
 }
 $('actbtn').innerHTML = ic('reply') + '<span>Activity</span>';
 $('actbtn').onclick = (e) => { e.stopPropagation(); toggleView(false); toggleAct(); };
@@ -1044,7 +1065,7 @@ window.addEventListener('message', (e) => {
     if (m.data.critter && m.data.critter !== defaultStyle) { defaultStyle = m.data.critter; renderLegend(); }
     $('style').value = critterStyle();
     replies = m.data.replies || {}; messengerOn = !!m.data.messenger; messengerStatus = m.data.messengerStatus || 'off'; active = m.data.active || [];
-    activity = m.data.activity || []; if (!$('act').hidden) renderActivity();
+    activity = m.data.activity || []; pending = m.data.pending || []; renderLate(); if (!$('act').hidden) renderActivity();
     drive = m.data.drive || drive; if (!$('inbox').hidden) renderInbox();
     renderVersions(m.data.versions || {});
     for (const id of [...selected]) if (!byId(id)) selected.delete(id);
