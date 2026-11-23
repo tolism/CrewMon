@@ -35,7 +35,7 @@ type Job = {
   textA?: string; textB?: string; approve?: boolean; dest?: string; description?: string; id?: string; title?: string
   zip?: string; zipId?: string; zipTitle?: string
   rounds?: number; turn?: number; waiting?: string; step?: string; transcript?: string[]
-  lastTo?: string; lastText?: string; sentAt?: number
+  replied?: boolean; lastTo?: string; lastText?: string; sentAt?: number
 }
 
 let offset = -1
@@ -52,6 +52,13 @@ const DEFAULT_A = 'Please write a hand-over note for another agent ("{B}") who w
   '(files, commands, data); open problems; and the exact next steps. When it is saved, reply "hand-over ready".'
 const DEFAULT_B = 'Read the hand-over note at {NOTE} from the agent "{A}" and continue from it. ' +
   'First reply with 2-3 lines on what you are taking over and what you will do next.'
+
+// The wording can be edited in CrewMon: both agents are told where the note is even if {NOTE} was left out
+const withNote = (t: string, j: Job, how: string) => !j.file || t.includes(j.file) ? t : t + '\n\n' + how.replace('{NOTE}', j.file)
+const noteRequest = (j: Job) => withNote(fill(j.textA || DEFAULT_A, j), j, 'Save the note as Markdown to {NOTE}. When it is saved, reply "hand-over ready".')
+const continueRequest = (j: Job) => withNote(fill(j.textB || DEFAULT_B, j), j, 'The hand-over note is at {NOTE}.')
+// what an agent wrote, without our tag and the wrapper around messages between sessions
+const bodyOf = (text: string) => text.replace(/^[\s\S]*?\[CrewMon [a-z0-9]+\]\s*/i, '').replace(/\s*<\/cross-session-message>\s*$/i, '').trim()
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function tools($: any) {
@@ -189,9 +196,9 @@ function tools($: any) {
     if (req.kind === 'resend') {
       if (old && old.lastTo && old.lastText) await send(old, old.lastTo, old.lastText, 'resent')
       else if (old && old.kind === 'handover' && old.step === 'note' && old.from)      // started before resend existed
-        await send(old, old.from, fill(old.textA || DEFAULT_A, old), 'resent')
+        await send(old, old.from, noteRequest(old), 'resent')
       else if (old && old.kind === 'handover' && old.step === 'continue' && old.to)
-        await send(old, old.to, fill(old.textB || DEFAULT_B, old), 'resent')
+        await send(old, old.to, continueRequest(old), 'resent')
       else if (old && old.kind === 'message' && old.to) await send(old, old.to, old.text ?? '', 'resent')
     } else if (req.kind === 'cancel') {
       if (old) { delete jobs[req.rid]; await log({ rid: req.rid, kind: 'cancelled' }) }
@@ -203,7 +210,7 @@ function tools($: any) {
           await log({ rid: old.rid, kind: 'done' }); delete jobs[old.rid]
         } else {
           old.step = 'continue'; old.waiting = old.to
-          await send(old, old.to!, fill(old.textB || DEFAULT_B, old))
+          await send(old, old.to!, continueRequest(old))
         }
       }
     } else if (req.kind === 'message' && req.to) {
@@ -218,14 +225,38 @@ function tools($: any) {
         `(${req.rounds} turns each, at most 150 words per turn). Topic: ${req.text}\nGive your opening view.`)
     } else if (req.kind === 'handover' && req.from && (req.to || req.dest === 'drive')) {
       const j = jobs[req.rid] = { ...req, step: 'note', waiting: req.from }
-      await send(j, req.from, fill(req.textA || DEFAULT_A, j))
+      await send(j, req.from, noteRequest(j))
     }
     await save()
   }
 
+  // A's note is written
+  const noteDone = async (j: Job) => {
+    if (j.approve) {   // CrewMon shows the note first; B is told only after "approve"
+      j.step = 'review'; j.waiting = ''
+      await log({ rid: j.rid, kind: 'note-ready', session: j.from, text: j.file })
+    } else {
+      j.step = 'continue'; j.waiting = j.to
+      await send(j, j.to!, continueRequest(j))
+    }
+  }
+  const noteSaved = async (j: Job, quietMs = 0) => {
+    if (!j.file) return true
+    if (!await $.fs.exists(j.file)) return false
+    const st = await $.fs.stat(j.file)
+    return st.size > 0 && Date.now() - st.mtimeMs >= quietMs
+  }
+  const checkNotes = async () => {
+    for (const j of Object.values(jobs)) {
+      if (j.kind !== 'handover' || j.step !== 'note' || !j.replied || !await noteSaved(j, 4000)) continue
+      if (j.step !== 'note' || jobs[j.rid] !== j) continue      // answered or cancelled meanwhile
+      await noteDone(j)
+      await save()
+    }
+  }
   // a reply from one of the sessions
   const onReply = async (j: Job, text: string) => {
-    const body = text.replace(/^[\s\S]*?\[CrewMon [a-z0-9]+\]\s*/i, '').trim()
+    const body = bodyOf(text)
     await log({ rid: j.rid, kind: 'reply', session: j.waiting, text: body })
     if (j.kind === 'message') { delete jobs[j.rid] }
     else if (j.kind === 'ask') {
@@ -249,26 +280,21 @@ function tools($: any) {
       }
     } else if (j.kind === 'handover') {
       if (j.step === 'note') {
-        if (j.approve) {   // CrewMon shows the note first; B is told only after "approve"
-          j.step = 'review'; j.waiting = ''
-          await log({ rid: j.rid, kind: 'note-ready', session: j.from, text: j.file })
-        } else {
-          j.step = 'continue'; j.waiting = j.to
-          await send(j, j.to!, fill(j.textB || DEFAULT_B, j))
-        }
+        if (await noteSaved(j)) await noteDone(j)
+        else j.replied = true      // an answer, but no note yet ("I'll do it later"): checkNotes goes on when it is saved
       } else { await log({ rid: j.rid, kind: 'done' }); delete jobs[j.rid] }
     }
     await save()
   }
   // a talk ends with A's summary
   const finishTalk = async (j: Job, text: string) => {
-    const body = text.replace(/^[\s\S]*?\[CrewMon [a-z0-9]+\]\s*/i, '').trim()
+    const body = bodyOf(text)
     await log({ rid: j.rid, kind: 'reply', session: j.a, text: body })
     await log({ rid: j.rid, kind: 'done' })
     delete jobs[j.rid]
     await save()
   }
-  return { save, log, start, onReply, finishTalk }
+  return { save, log, start, onReply, finishTalk, checkNotes }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -300,7 +326,11 @@ export const register: Register = (on) => {
   on('session.start', async ($, e, next) => {
     const out = await next(e)
     await load($)
-    const { save, log, start } = tools($)
+    const { save, log, start, checkNotes } = tools($)
+    // first run: skip what was there before. Decided here and not at the first request, which would then be skipped itself
+    // (no outbox yet: everything that will be written to it is new)
+    if (!await $.fs.exists(OUTBOX)) offset = 0
+    else if (offset < 0) offset = (await $.fs.stat(OUTBOX)).size
     await save()   // publish active.json with the new fields straight away
     $.clock.every(1500, async () => {
       if (busy) return
@@ -308,7 +338,7 @@ export const register: Register = (on) => {
       try {
         const st = await $.fs.stat(OUTBOX).catch(() => undefined)
         if (st) {
-          if (offset < 0 || offset > st.size) offset = st.size     // first run: skip what was there before
+          if (offset < 0 || offset > st.size) offset = st.size     // the file was cut short: skip what is in it
           if (st.size > offset) {
             const added = String(await $.fs.read(OUTBOX, { offset, length: st.size - offset }))
             offset = st.size
@@ -319,6 +349,7 @@ export const register: Register = (on) => {
             await save()
           }
         }
+        await checkNotes()
       } finally { busy = false }
     })
     $.clock.every(4000, () => { void $.fs.write(BEAT, JSON.stringify({ at: Date.now(), version: MOD_VERSION })) })
