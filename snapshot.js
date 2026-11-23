@@ -1,9 +1,10 @@
 // CrewMon: the list of Claude Code sessions on this machine (read-only).
-// Sessions = chat files in ~/.claude/projects/<project>/<id>.jsonl; running state from /proc.
+// Sessions = chat files in ~/.claude/projects/<project>/<id>.jsonl; running state from processes.js.
 'use strict';
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { runningSessions, sessionFiles } = require('./processes');
 
 const PROJECTS = path.join(os.homedir(), '.claude', 'projects');
 const KEEPER_STATE = path.join(os.homedir(), '.claude', 'keeper', 'state.json');
@@ -130,49 +131,6 @@ function readSession(file) {
   return s;
 }
 
-function cmdline(pid) {
-  try { return fs.readFileSync(`/proc/${pid}/cmdline`).toString().split('\0').filter(Boolean); }
-  catch (_) { return []; }
-}
-function ppid(pid) {
-  try { const s = fs.readFileSync(`/proc/${pid}/stat`, 'utf8'); return parseInt(s.slice(s.lastIndexOf(')') + 2).split(' ')[1], 10); }
-  catch (_) { return 0; }
-}
-// when a process started (ms since the epoch): /proc/<pid>/stat field 22 (clock ticks since boot) + boot time
-let bootMs = null;
-function procStart(pid) {
-  try {
-    if (bootMs === null) bootMs = Number(/btime (\d+)/.exec(fs.readFileSync('/proc/stat', 'utf8'))[1]) * 1000;
-    const st = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
-    const ticks = Number(st.slice(st.lastIndexOf(')') + 2).split(' ')[19]);
-    return bootMs + ticks * 10;          // USER_HZ is 100 on Linux
-  } catch (_) { return 0; }
-}
-function isClaude(argv) { return argv.length > 0 && /(^|\/)claude$/.test(argv[0]); }
-
-// {sessionId: [{pid, host}]}  host = 'vscode' | 'machine' (keeper/tmux) | 'terminal'
-function runningSessions() {
-  const out = {};
-  for (const pid of fs.readdirSync('/proc')) {
-    if (!/^\d+$/.test(pid)) continue;
-    const a = cmdline(pid);
-    if (!isClaude(a)) continue;
-    const parent = cmdline(ppid(pid));
-    if (isClaude(parent)) continue;                       // a subagent or helper of a chat
-    let id = null;
-    for (let i = 0; i < a.length; i++) {
-      if (a[i].startsWith('--resume=')) id = a[i].slice(9);
-      else if (a[i] === '--resume' && a[i + 1]) id = a[i + 1];
-    }
-    if (!id) continue;
-    const pj = parent.join(' ');
-    const host = pj.includes('.vscode-server') ? 'vscode'
-      : (a.includes('--remote-control') && !a.includes('stream-json')) ? 'machine' : 'terminal';
-    (out[id] = out[id] || []).push({ pid: Number(pid), host, start: procStart(pid) });
-  }
-  return out;
-}
-
 function roles() {
   try { return JSON.parse(fs.readFileSync(ROLES, 'utf8')); } catch (_) { return {}; }
 }
@@ -180,16 +138,8 @@ function roles() {
 // Agent names as other sessions see them (ListAgents / SendMessage): ~/.claude/sessions/<pid>.json of running sessions
 function agentNames() {
   const out = {};
-  const dir = path.join(os.homedir(), '.claude', 'sessions');
-  let files = [];
-  try { files = fs.readdirSync(dir).filter(f => f.endsWith('.json')); } catch (_) { return out; }
-  for (const f of files) {
-    try {
-      const d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
-      if (!d.sessionId || !fs.existsSync('/proc/' + d.pid)) continue;
-      out[d.sessionId] = { name: d.name || '', address: d.messagingSocketPath ? 'uds:' + d.messagingSocketPath : '', status: d.status || '', ref: '' };
-    } catch (_) { /* skip */ }
-  }
+  for (const d of sessionFiles())
+    out[d.sessionId] = { name: d.name || '', address: d.messagingSocketPath ? 'uds:' + d.messagingSocketPath : '', status: d.status || '', ref: '' };
   // refs: from the messenger's last ListAgents (name [ref]); a name listed twice gets no ref (it would be a guess)
   try {
     const a = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', 'crewmon', 'messenger', 'agents.json'), 'utf8'));
@@ -268,7 +218,8 @@ function snapshot(days) {
       const r = running[id] || [];
       const hosts = [...new Set(r.map(x => x.host))];
       const ageS = (Date.now() - st.mtimeMs) / 1000;
-      const state = r.length === 0 ? 'offline' : ageS < BUSY_S ? 'busy' : 'idle';
+      const busy = r.some(x => x.status === 'busy') || (r.some(x => !x.status) && ageS < BUSY_S);   // Claude Code's word, else the file's age
+      const state = r.length === 0 ? 'offline' : busy ? 'busy' : 'idle';
       const k = keeper && keeper.chats && keeper.chats[id];
       sessions.push(Object.assign({}, c.data, {
         id, project: d, file, hosts, state, ageS: Math.round(ageS),

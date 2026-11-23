@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const os = require('os');
 const { execFile, execFileSync } = require('child_process');
 const { snapshot, runningSessions, ROLES, AUTO, GROUPS } = require('./snapshot');
+const { claudeBin, tmuxBin } = require('./processes');
 
 // The keeper (keeps chats running on the machine when VS Code closes them): ~/.local/bin/keeper, else the bundled copy.
 function keeperPath(root) {
@@ -43,7 +44,7 @@ const HANDOVERS = path.join(os.homedir(), '.claude', 'crewmon', 'handovers');
 const MSG_DIR = path.join(os.homedir(), '.claude', 'crewmon', 'messenger');
 const MSG_TMUX = 'crewmon-messenger';
 function tmuxHas(name) {
-  return new Promise(r => execFile('tmux', ['has-session', '-t', name], (err) => r(!err)));
+  return new Promise(r => execFile(tmuxBin(), ['has-session', '-t', name], (err) => r(!err)));
 }
 function heartbeat() {   // {at, version}; older messengers wrote only the time
   try {
@@ -76,7 +77,7 @@ async function messengerUpToDate(root) {
   try { busy = JSON.parse(fs.readFileSync(path.join(MSG_DIR, 'active.json'), 'utf8')); } catch (_) { /* none */ }
   if (busy.length) return;              // a conversation is in progress: a reply could arrive while it restarts, so wait
   if (hb && hb.version !== mine) {      // an older messenger is running: restart it on this version (its conversations are kept)
-    await new Promise(r => execFile('tmux', ['kill-session', '-t', MSG_TMUX], () => r()));
+    await new Promise(r => execFile(tmuxBin(), ['kill-session', '-t', MSG_TMUX], () => r()));
     await startMessenger(root, true);
     vscode.window.setStatusBarMessage('CrewMon: messenger updated to v' + mine, 6000);
   }
@@ -89,13 +90,14 @@ async function startMessenger(root, quiet) {
   fs.mkdirSync(MSG_DIR, { recursive: true });
   const mod = MOD_HOME;
   const cmd = `exec env $(env | grep -oE "^CLAUDE[A-Z_]*" | sed "s/^/-u /") '${bin}' --plugin-dir '${mod}' --permission-mode auto`;
-  execFile('tmux', ['new-session', '-d', '-s', MSG_TMUX, '-c', MSG_DIR, '-x', '200', '-y', '50', cmd], (err) => {
-    if (err) vscode.window.showErrorMessage('CrewMon: could not start the messenger: ' + err.message);
+  execFile(tmuxBin(), ['new-session', '-d', '-s', MSG_TMUX, '-c', MSG_DIR, '-x', '200', '-y', '50', cmd], (err) => {
+    if (err) vscode.window.showErrorMessage('CrewMon: could not start the messenger: ' +
+      (err.code === 'ENOENT' ? 'tmux is not installed (macOS: brew install tmux).' : err.message));
     else if (!quiet) vscode.window.showInformationMessage('CrewMon: messenger starting. The first time, Claude asks whether to trust its folder: ' +
       'run "tmux attach -t crewmon-messenger" in a terminal, choose "Yes, I trust this folder", then press Ctrl+b d.');
   });
 }
-function stopMessenger() { execFile('tmux', ['kill-session', '-t', MSG_TMUX], () => push()); }
+function stopMessenger() { execFile(tmuxBin(), ['kill-session', '-t', MSG_TMUX], () => push()); }
 function queue(job) {
   const rid = crypto.randomBytes(3).toString('hex');
   fs.mkdirSync(MSG_DIR, { recursive: true });
@@ -379,15 +381,6 @@ async function handover(m) {
 }
 
 // ---- "In charge of" one-liners: made by a small model from each session's latest summary, cached in auto.json ----
-function claudeBin() {   // the Claude binary shipped with the newest installed Claude Code extension
-  const dir = path.join(os.homedir(), '.vscode-server', 'extensions');
-  const found = (fs.existsSync(dir) ? fs.readdirSync(dir) : [])
-    .map(d => ({ m: /^anthropic\.claude-code-(\d+)\.(\d+)\.(\d+)/.exec(d), bin: path.join(dir, d, 'resources', 'native-binary', 'claude') }))
-    .filter(x => x.m && fs.existsSync(x.bin))
-    .map(x => ({ bin: x.bin, v: x.m.slice(1).map(Number) }))
-    .sort((p, q) => q.v[0] - p.v[0] || q.v[1] - p.v[1] || q.v[2] - p.v[2]);
-  return found.length ? found[0].bin : null;
-}
 const describing = new Set();
 let describeBusy = false;
 function describeQueue(sessions) {
@@ -437,9 +430,9 @@ async function renameSession(m) {
   const clean = name.trim().replace(/\s+/g, ' ').slice(0, 120);
   if (hosts.includes('machine')) {   // the keeper's copy in tmux: the CLI's own /rename
     const t = 'cc-' + m.id.slice(0, 8);
-    execFile('tmux', ['send-keys', '-t', t, '-l', '/rename ' + clean], (err) => {
+    execFile(tmuxBin(), ['send-keys', '-t', t, '-l', '/rename ' + clean], (err) => {
       if (err) { vscode.window.showErrorMessage('CrewMon: could not reach the keeper copy: ' + err.message); return; }
-      execFile('tmux', ['send-keys', '-t', t, 'Enter'], () => setTimeout(push, 1500));
+      execFile(tmuxBin(), ['send-keys', '-t', t, 'Enter'], () => setTimeout(push, 1500));
     });
     return;
   }

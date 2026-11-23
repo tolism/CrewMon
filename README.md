@@ -38,9 +38,9 @@ are still running, and which you left days ago. CrewMon turns them into a small 
 
 ### Requirements
 - **VS Code** 1.85 or newer with the **Claude Code** extension, signed in.
-- **Linux** for the live state (busy, idle, running). CrewMon reads the process list from `/proc`. It is also where
-  VS Code runs over Remote-SSH.
-- **Python 3**, to build the package. The keeper and the messenger also need **tmux**.
+- **Linux** (also over Remote-SSH) or **macOS**. Windows should show the map and the live state, but is untested.
+- The **keeper** and the **messenger** need tmux, so Linux or macOS (`brew install tmux`).
+- **Python 3**, to build the package and for the keeper.
 
 ### 1. Get the package
 Either use a ready `crewmon-<version>.vsix`, or build it from this repository:
@@ -201,13 +201,15 @@ back.
 | Messenger stays on "starting…" | `tmux attach -t crewmon-messenger` and accept the folder-trust question |
 | A message was not delivered | look at `~/.claude/crewmon/messenger/inbox.jsonl` for an `error` line |
 | Rename did nothing | for a chat open in VS Code, CrewMon opens Claude's own *Rename* box; type the name there |
-| No live state (all grey) | CrewMon needs Linux (`/proc`) |
+| No live state (all grey) | Linux: CrewMon needs `/proc`. macOS and Windows: check that `~/.claude/sessions` has a file per running chat |
+| "tmux is not installed" | macOS: `brew install tmux`; Linux: your package manager |
 
 ## Development
 
 ```
 package.json        extension manifest (command, Ctrl+Alt+A, settings)
 extension.js        the VS Code side: the tab, refresh, actions, keeper, messenger, AI descriptions
+processes.js        which chats are running (Linux: /proc; macOS: ps + Claude Code's session files; Windows: session files)
 snapshot.js         reads the sessions (node snapshot.js prints them in a terminal)
 media/map.html      the map
 media/critters.js   the critters: three styles, 11 accessories, a pose per state
