@@ -101,8 +101,19 @@ class state_lock:
         self.f.close()
 
 
+def tmux_bin():
+    """tmux, also where Homebrew puts it (an app started from the Dock may not have that on its PATH)."""
+    for p in (shutil.which("tmux"), "/opt/homebrew/bin/tmux", "/usr/local/bin/tmux"):
+        if p and os.access(p, os.X_OK):
+            return p
+    return None
+
+
 def tmux(*args, check=False):
-    return subprocess.run(["tmux", *args], capture_output=True, text=True, check=check)
+    exe = tmux_bin()
+    if not exe:
+        return subprocess.CompletedProcess(["tmux", *args], 127, "", "tmux is not installed (macOS: brew install tmux)")
+    return subprocess.run([exe, *args], capture_output=True, text=True, check=check)
 
 
 def tmux_sessions():
@@ -116,13 +127,14 @@ def tname(cid):
 
 def claude_bin():
     """Newest Claude binary shipped with the VS Code extension (same version and login as VS Code)."""
-    cands = glob.glob(os.path.join(HOME, ".vscode-server/extensions/anthropic.claude-code-*/resources/native-binary/claude"))
+    cands = [c for root in (".vscode-server", ".vscode-server-insiders", ".vscode", ".vscode-insiders")
+             for c in glob.glob(os.path.join(HOME, root, "extensions/anthropic.claude-code-*/resources/native-binary/claude"))]
     def ver(p):
         m = re.search(r"claude-code-(\d+)\.(\d+)\.(\d+)", p)
         return tuple(int(x) for x in m.groups()) if m else (0,)
     cands = [c for c in cands if os.access(c, os.X_OK)]
     if not cands:
-        raise SystemExit("keeper: no Claude binary found in ~/.vscode-server/extensions")
+        raise SystemExit("keeper: no Claude binary found in the VS Code extensions (~/.vscode-server, ~/.vscode)")
     return max(cands, key=ver)
 
 
@@ -143,8 +155,67 @@ def ppid_of(pid):
 
 
 def vscode_chats():
-    """{chat id: {cwd, mode}} for chats VS Code is running now.
-    A VS Code chat = a native-binary claude process in stream-json mode whose parent is VS Code's server."""
+    """{chat id: {cwd, mode}} for chats VS Code is running now."""
+    return vscode_chats_proc() if sys.platform.startswith("linux") else vscode_chats_ps()
+
+
+def ps_table():
+    """{pid: {ppid, args, start}} where there is no /proc (macOS). Raises if ps fails: keeper must not guess that
+    nothing is running."""
+    r = subprocess.run(["ps", "-axww", "-o", "pid=,ppid=,lstart=,args="], capture_output=True, text=True, errors="replace",
+                       check=True, timeout=10, env={**os.environ, "LC_ALL": "C", "TZ": "UTC"})
+    out = {}
+    for line in r.stdout.splitlines():
+        m = re.match(r"\s*(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d+\s+[\d:]+\s+\d{4})\s+(.*)$", line)
+        if m:
+            out[int(m[1])] = {"ppid": int(m[2]), "args": m[4], "start": " ".join(m[3].split())}
+    if not out:
+        raise RuntimeError("ps listed no processes")
+    return out
+
+
+def vscode_chats_ps():
+    """The same from `ps`, plus Claude Code's session files (~/.claude/sessions/<pid>.json), which also name a new chat
+    (no --resume). A chat counts if either source says so, so a missing session file never hides a running chat."""
+    table = ps_table()
+    out = {}
+
+    def flag(args, name):
+        m = re.search(r"(?:^|\s)--" + name + r"[= ](\S+)", args)
+        return m[1] if m else None
+
+    for pid, p in table.items():
+        a = p["args"]
+        if "native-binary/claude " not in a or "stream-json" not in a:
+            continue
+        parent = table.get(p["ppid"], {}).get("args", "")
+        if "Helper (Plugin)" not in parent and ".vscode-server" not in parent:
+            continue  # e.g. a subagent started by a chat, not a chat
+        cid = flag(a, "resume")
+        if cid:
+            out[cid] = {"cwd": None, "mode": flag(a, "permission-mode") or "default", "pid": pid}
+    for path in glob.glob(os.path.join(HOME, ".claude", "sessions", "*.json")):
+        try:
+            with open(path) as f:
+                d = json.load(f)
+            cid, pid = d.get("sessionId"), d.get("pid")
+        except (OSError, ValueError, AttributeError):
+            continue
+        p = table.get(pid)
+        if not cid or not p or d.get("entrypoint") != "claude-vscode":
+            continue
+        started = d.get("procStart")
+        if isinstance(started, str) and re.match(r"\w{3} \w{3}", started):
+            t = [time.mktime(time.strptime(" ".join(x.split()), "%a %b %d %H:%M:%S %Y")) for x in (started, p["start"])]
+            if abs(t[0] - t[1]) > 2:
+                continue  # an old file: the pid now belongs to another process
+        # the mode comes from this process; the folder only from the session file
+        out[cid] = {"cwd": d.get("cwd"), "mode": flag(p["args"], "permission-mode") or "default", "pid": pid}
+    return out
+
+
+def vscode_chats_proc():
+    """A VS Code chat = a native-binary claude process in stream-json mode whose parent is VS Code's server."""
     out = {}
     for pid in os.listdir("/proc"):
         if not pid.isdigit():
@@ -262,7 +333,7 @@ def tick(s, first=False):
     for cid, info in vs.items():
         c = s["chats"].setdefault(cid, {})
         if managed(s, cid) or c:
-            c.update(cwd=info["cwd"], mode=info["mode"], last_vscode=now)
+            c.update(cwd=info["cwd"] or c.get("cwd"), mode=info["mode"], last_vscode=now)
             if c.get("holder") != "vscode":
                 if c.get("holder") == "keeper" and tname(cid) in live and not c.get("stopping"):
                     # do not cut a turn short: wait until the copy has been quiet for IDLE_S (at most HANDBACK_WAIT_S)
@@ -352,7 +423,9 @@ def cmd_start():
     me = os.path.abspath(__file__)
     r = tmux("new-session", "-d", "-s", LOOP_SESSION,
              f'exec env $(env | grep -oE "^(CLAUDE[A-Z_]*)" | sed "s/^/-u /") python3 {shlex.quote(me)} run')
-    print("keeper started" if r.returncode == 0 else f"failed: {r.stderr.strip()}")
+    if r.returncode != 0:
+        raise SystemExit(f"keeper: could not start: {r.stderr.strip()}")
+    print("keeper started")
 
 
 def cmd_stop():
