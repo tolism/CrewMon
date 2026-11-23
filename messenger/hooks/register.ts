@@ -35,7 +35,7 @@ type Job = {
   textA?: string; textB?: string; approve?: boolean; dest?: string; description?: string; id?: string; title?: string
   zip?: string; zipId?: string; zipTitle?: string
   rounds?: number; turn?: number; waiting?: string; step?: string; transcript?: string[]
-  lastTo?: string; lastText?: string; sentAt?: number
+  replied?: boolean; lastTo?: string; lastText?: string; sentAt?: number
 }
 
 let offset = -1
@@ -230,6 +230,30 @@ function tools($: any) {
     await save()
   }
 
+  // A's note is written
+  const noteDone = async (j: Job) => {
+    if (j.approve) {   // CrewMon shows the note first; B is told only after "approve"
+      j.step = 'review'; j.waiting = ''
+      await log({ rid: j.rid, kind: 'note-ready', session: j.from, text: j.file })
+    } else {
+      j.step = 'continue'; j.waiting = j.to
+      await send(j, j.to!, continueRequest(j))
+    }
+  }
+  const noteSaved = async (j: Job, quietMs = 0) => {
+    if (!j.file) return true
+    if (!await $.fs.exists(j.file)) return false
+    const st = await $.fs.stat(j.file)
+    return st.size > 0 && Date.now() - st.mtimeMs >= quietMs
+  }
+  const checkNotes = async () => {
+    for (const j of Object.values(jobs)) {
+      if (j.kind !== 'handover' || j.step !== 'note' || !j.replied || !await noteSaved(j, 4000)) continue
+      if (j.step !== 'note' || jobs[j.rid] !== j) continue      // answered or cancelled meanwhile
+      await noteDone(j)
+      await save()
+    }
+  }
   // a reply from one of the sessions
   const onReply = async (j: Job, text: string) => {
     const body = bodyOf(text)
@@ -256,13 +280,8 @@ function tools($: any) {
       }
     } else if (j.kind === 'handover') {
       if (j.step === 'note') {
-        if (j.approve) {   // CrewMon shows the note first; B is told only after "approve"
-          j.step = 'review'; j.waiting = ''
-          await log({ rid: j.rid, kind: 'note-ready', session: j.from, text: j.file })
-        } else {
-          j.step = 'continue'; j.waiting = j.to
-          await send(j, j.to!, continueRequest(j))
-        }
+        if (await noteSaved(j)) await noteDone(j)
+        else j.replied = true      // an answer, but no note yet ("I'll do it later"): checkNotes goes on when it is saved
       } else { await log({ rid: j.rid, kind: 'done' }); delete jobs[j.rid] }
     }
     await save()
@@ -275,7 +294,7 @@ function tools($: any) {
     delete jobs[j.rid]
     await save()
   }
-  return { save, log, start, onReply, finishTalk }
+  return { save, log, start, onReply, finishTalk, checkNotes }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -307,7 +326,7 @@ export const register: Register = (on) => {
   on('session.start', async ($, e, next) => {
     const out = await next(e)
     await load($)
-    const { save, log, start } = tools($)
+    const { save, log, start, checkNotes } = tools($)
     // first run: skip what was there before. Decided here and not at the first request, which would then be skipped itself
     // (no outbox yet: everything that will be written to it is new)
     if (!await $.fs.exists(OUTBOX)) offset = 0
@@ -330,6 +349,7 @@ export const register: Register = (on) => {
             await save()
           }
         }
+        await checkNotes()
       } finally { busy = false }
     })
     $.clock.every(4000, () => { void $.fs.write(BEAT, JSON.stringify({ at: Date.now(), version: MOD_VERSION })) })
