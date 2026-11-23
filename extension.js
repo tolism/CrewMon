@@ -345,6 +345,7 @@ async function handover(m) {
   fs.mkdirSync(HANDOVERS, { recursive: true });
   const file = path.join(HANDOVERS, `${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '')}-${m.from.slice(0, 8)}-to-${m.to.slice(0, 8)}.md`);
   const fillT = (t) => (t || '').replace(/\{NOTE\}/g, file).replace(/\{A\}/g, m.fromTitle).replace(/\{B\}/g, m.toTitle);
+  const withNote = (t, how) => t.includes(file) ? t : t + '\n\n' + how + file + '.';   // {NOTE} may have been edited out
   if (m.dest === 'drive') {
     if ((await messengerStatus()) !== 'on') { vscode.window.showErrorMessage('CrewMon: a Google Drive hand-over needs the messenger (start it in the top bar).'); return; }
     if (driveBlocked(m.fromCwd)) { vscode.window.showErrorMessage('CrewMon: Google Drive hand-overs are turned off for this folder (setting crewmon.driveBlockedFolders).'); return; }
@@ -359,7 +360,7 @@ async function handover(m) {
     vscode.window.showInformationMessage(`CrewMon: hand-over started: "${m.fromTitle}" writes the note, then "${m.toTitle}" continues.`);
     return;
   }
-  const ask = m.textA ? fillT(m.textA) : `Please write a hand-over note for another agent ("${m.toTitle}") who will continue part of your work. ` +
+  const ask = m.textA ? withNote(fillT(m.textA), 'Save the note as Markdown to ') : `Please write a hand-over note for another agent ("${m.toTitle}") who will continue part of your work. ` +
     `Save it as Markdown to ${file}. Include: the goal; what is done; key decisions and why; where things are (files, commands, ` +
     `data); open problems; and the exact next steps. Reply "hand-over ready" when it is saved.`;
   await openChat(m.from, ask);
@@ -371,7 +372,7 @@ async function handover(m) {
       const pick = await vscode.window.showInformationMessage(`CrewMon: the hand-over note from "${m.fromTitle}" is ready.`, `Open "${m.toTitle.slice(0, 30)}" with it`, 'Show the note');
       if (pick === 'Show the note') { vscode.window.showTextDocument(vscode.Uri.file(file)); }
       else if (pick) {
-        await openChat(m.to, m.textB ? fillT(m.textB) : `Read the hand-over note at ${file} from the agent "${m.fromTitle}" and continue from it. ` +
+        await openChat(m.to, m.textB ? withNote(fillT(m.textB), 'The hand-over note is at ') : `Read the hand-over note at ${file} from the agent "${m.fromTitle}" and continue from it. ` +
           `First confirm in 2-3 lines what you are taking over and what you will do next.`);
       }
     } else if (Date.now() - started > 3 * 3600e3) clearInterval(timer);
