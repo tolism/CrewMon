@@ -146,9 +146,13 @@ app chat. It needs the messenger, and uses the Google Drive connector of your Cl
    Google Drive**. Before uploading, CrewMon checks the note for participant ids, study codes, local paths, email and IP
    addresses and secrets, and asks again if it finds any. The note becomes a Google Doc in the folder
    **CrewMon hand-overs** (created the first time), and you get its link and a **pickup message** to paste anywhere.
+   **Files** can go with it: choose *Attach files or folders…*, and CrewMon zips them (up to 20 MB) next to the note as
+   `<note title> (files).zip`, after showing you every file. Data files (`.parquet`, `.csv`, `.pkl`, `.h5`, …), secrets
+   (`.env`, keys), links, `.git`, `node_modules` and caches are always left out.
 2. **Pick up**: the **Inbox** (top bar) lists the hand-overs in that folder. **Start with…** gives one to a running agent
-   here: CrewMon downloads it, tells the agent to continue, and marks the Doc "Picked up by …". **Open** and **Pickup
-   message** are there too.
+   here: CrewMon downloads it (and unzips its files into `handovers/drive-<id>-files/`), tells the agent to continue,
+   and marks the Doc "Picked up by …". A zip you put in the folder yourself shows up too: **Unzip for…** unpacks it for
+   an agent here. **Open** and **Pickup message** are there too.
 
 The folder is private to your Drive until you share it. Turn Drive hand-overs off for projects with sensitive data with
 `crewmon.driveBlockedFolders` (parts of a folder path, e.g. `["AI_PROG_PD_risk_modeling"]`).
