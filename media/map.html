@@ -241,6 +241,25 @@
   .chip { border-radius: 999px; padding: 3px 11px; transition: border-color .12s, transform .12s; }
   .chip:hover { transform: translateY(-1px); }
 
+  /* drag the divider to resize the panel; it scrolls when it does not fit; narrow tabs put the buttons on their own row */
+  header, #dock, #split { flex-shrink: 0; }
+  #main { min-height: 60px; }
+  #panel { flex: 0 1 auto; min-height: 60px; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; }
+  #split { display: none; height: 9px; cursor: ns-resize; touch-action: none; position: relative; border-top: 1px solid var(--border);
+    background: var(--vscode-sideBar-background, var(--bg)); }
+  #split::after { content: ''; position: absolute; left: 50%; top: 3px; width: 44px; height: 3px; margin-left: -22px; border-radius: 2px; background: var(--muted); opacity: .6; }
+  #split:hover::after, #split:focus-visible::after, body.resizing #split::after { background: var(--accent); opacity: 1; }
+  #split:focus { outline: none; }
+  body.resizing { cursor: ns-resize; user-select: none; }
+  #split + #panel { border-top: 0; }
+  #split, #panel { z-index: 3; } #panel { position: relative; }
+  #panel.shut { height: 0; min-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; visibility: hidden; box-shadow: none; }
+  body.dragging #split.over, body.dragging #split.over + #panel { visibility: hidden; }   /* the dock's drop zones are under it */
+  @media (max-width: 1000px) {
+    .pcard { grid-template-columns: auto minmax(0, 1fr); }
+    #panel .actions { grid-column: 1 / -1; justify-content: flex-start; }
+  }
+
   /* dock */
   #dock { gap: 8px; padding: 8px 18px; background: var(--vscode-sideBar-background, var(--bg)); }
   .zone { display: inline-flex; align-items: center; gap: 6px; border-radius: var(--r2); padding: 4px 10px; transition: background .12s, border-color .12s; }
@@ -294,6 +313,7 @@
 </div>
 <div id="main"><div id="groups"></div><div id="free" style="display:none"></div><div id="empty"><b>No agents here yet.</b><br>Start a Claude Code chat and it appears on the map, or change the filter.</div></div>
 <div id="dock"></div>
+<div id="split" role="separator" aria-orientation="horizontal" aria-label="Resize the agent panel" tabindex="0" title="Drag to resize · double-click: automatic height"></div>
 <div id="panel">
   <div class="pcard">
     <div id="pav"></div>
@@ -377,7 +397,8 @@ let stateFilter = '';
 let style = saved.style || '';   // '' = the crewmon.critter setting
 let positions = saved.positions || {};          // free layout: id -> {x, y}
 let selected = new Set(saved.selected || []);
-const persist = () => vscode.setState({ layout, positions, selected: [...selected], bg, bgv: 2, style });
+let panelH = saved.panelH || 0;                 // height of the agent panel; 0 = automatic
+const persist = () => vscode.setState({ layout, positions, selected: [...selected], bg, bgv: 2, style, panelH });
 let defaultStyle = 'bot';
 const critterStyle = () => style || defaultStyle;
 function applyBg() { $('main').className = 'bg-' + bg; $('bg').value = bg; }
@@ -610,10 +631,41 @@ function select(id, add) {
 }
 function clearSel() { selected.clear(); persist(); render(); }
 function sel() { return [...selected].map(byId).filter(Boolean); }
+// The divider above the panel: drag it, or focus it and use the up/down keys; double-click = automatic height.
+// Dragged up it slides over the dock and the map (a short tab has no other room); dragged down it closes to the bar alone.
+const PANEL_MIN = 60, MAP_MIN = 60, TOP_MIN = 48, SHUT = 1;      // panelH: 0 = automatic, SHUT = closed
+const tall = (q) => document.querySelector(q).offsetHeight;
+function panelRoom() { return innerHeight - MAP_MIN - tall('header') - tall('#dock') - tall('#split'); }   // without covering anything; < 0 in a very short tab
+function panelMax() { return Math.max(PANEL_MIN, innerHeight - TOP_MIN - tall('#split')); }
+function sizePanel() {
+  const p = $('panel'), room = panelRoom(), shut = panelH === SHUT;
+  const h = shut ? 0 : panelH ? Math.min(panelMax(), Math.max(PANEL_MIN, panelH)) : 0;
+  const over = Math.max(0, (shut ? 0 : h || Math.min(PANEL_MIN, panelMax())) - room);
+  p.classList.toggle('shut', shut);
+  p.style.height = h ? h + 'px' : '';
+  p.style.maxHeight = (h || Math.max(PANEL_MIN, room)) + 'px';
+  p.style.flexShrink = h ? 0 : '';
+  $('split').style.marginTop = over ? -over + 'px' : '';
+  $('split').classList.toggle('over', over > 0);
+}
+function setPanelH(h) { panelH = !h ? 0 : h < PANEL_MIN / 2 ? SHUT : Math.round(Math.min(panelMax(), Math.max(PANEL_MIN, h))); sizePanel(); }
+(() => {
+  const d = $('split'); let from = null;
+  const end = () => { if (!from) return; from = null; document.body.classList.remove('resizing'); persist(); };
+  d.addEventListener('pointerdown', (e) => { if (e.button) return; from = { y: e.clientY, h: $('panel').offsetHeight };
+    d.setPointerCapture(e.pointerId); document.body.classList.add('resizing'); });
+  d.addEventListener('pointermove', (e) => { if (from && e.clientY !== from.y) setPanelH(Math.max(1, from.h + from.y - e.clientY)); });
+  d.addEventListener('pointerup', end); d.addEventListener('pointercancel', end);
+  d.addEventListener('dblclick', () => { setPanelH(0); persist(); });
+  d.addEventListener('keydown', (e) => { if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault(); e.stopPropagation(); const h = $('panel').offsetHeight; setPanelH(e.key === 'ArrowUp' ? Math.max(PANEL_MIN, h + 24) : h <= PANEL_MIN ? SHUT : Math.max(PANEL_MIN, h - 24)); persist(); });
+  addEventListener('resize', sizePanel);
+})();
 function renderPanel() {
   const list = sel(), p = $('panel');
+  $('split').style.display = list.length ? 'block' : 'none';
   if (!list.length) { p.style.display = 'none'; return; }
-  p.style.display = 'block';
+  p.style.display = 'block'; sizePanel();
   const one = list.length === 1 ? list[0] : null;
   $('pwho').textContent = one ? one.title : list.length + ' agents selected';
   $('pwhat').textContent = one ? (role(one) ? 'In charge of: ' + role(one) : '') : list.map(s => s.title).join(' · ');
