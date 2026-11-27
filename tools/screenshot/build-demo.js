@@ -5,7 +5,7 @@ const root = path.join(__dirname, '..', '..');
 const data = require('./demo-data.js');
 let h = fs.readFileSync(path.join(root, 'media', 'map.html'), 'utf8');
 h = h.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/s, '');          // a local file, no webview CSP
-h = h.replace(/\{\{nonce\}\}/g, 'demo').replace(/\{\{critters\}\}/g, '../../media/critters.js');
+h = h.replace(/\{\{nonce\}\}/g, 'demo').replace(/\{\{critters\}\}/g, '../../media/critters.js').replace(/\{\{tray\}\}/g, 'up');
 const theme = `<style>:root {
   --vscode-foreground:#cccccc; --vscode-descriptionForeground:#9d9d9d; --vscode-editor-background:#1f1f1f;
   --vscode-editorHoverWidget-background:#202020; --vscode-editorHoverWidget-border:#454545; --vscode-focusBorder:#0078d4;

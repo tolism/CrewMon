@@ -246,6 +246,20 @@
   .zone { display: inline-flex; align-items: center; gap: 6px; border-radius: var(--r2); padding: 4px 10px; transition: background .12s, border-color .12s; }
   body.dragging #dock { box-shadow: 0 -6px 18px rgba(0,0,0,.22); }
   body.dragging .zone { border-style: solid; color: var(--fg); }
+  /* the tray: dock + agent card + message bar, rolled up or down */
+  #traybar { display: flex; gap: 10px; align-items: center; padding: 4px 18px; border-top: 1px solid var(--border); background: var(--vscode-sideBar-background, var(--bg)); font-size: 12px; min-height: 30px; }
+  #traybtn { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; flex: none; }
+  #traysum { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #traysum b { color: var(--fg); font-weight: 600; }
+  body.traydown #traybar { padding-right: 330px; }   /* room for the versions badge */
+  body.traydown #dock, body.traydown #panel > :not(#pconvo) { display: none; }
+  body.traydown #panel { padding: 0 18px 6px; box-shadow: none; border-top: 0; }
+  body.traydown #pconvo { margin-top: 0; padding-right: 310px; }
+  body.traydown.dragging #dock { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 8; }
+  @media (max-width: 700px) { body.traydown #traybar { padding-right: 18px; padding-bottom: 26px; } body.traydown #pconvo { padding-right: 0; padding-bottom: 24px; } }
+  /* a narrow tab: the card's buttons go under the text instead of squeezing it */
+  #panel .what { min-width: 0; flex: none; }
+  @media (max-width: 1250px) { .pcard { grid-template-columns: auto minmax(0, 1fr); } #panel .pcard .actions { grid-column: 1 / -1; justify-content: flex-start; } }
   #empty { text-align: center; padding: 60px 16px; }
   #empty .ico { width: 0; }
   #main.bg-stars { animation: none; }
@@ -270,7 +284,7 @@
     background-size: 96px 40px, 900px 220px, 520px 160px, 120px 120px, 100% 100%; background-attachment: local; }
 </style>
 </head>
-<body>
+<body data-tray="{{tray}}">
 <header>
   <div class="brand" id="brand">CrewMon</div>
   <div class="search"><span id="searchico"></span><input id="q" type="search" placeholder="Filter agents  ( / )" aria-label="Filter agents"></div>
@@ -293,6 +307,7 @@
   <span class="k">Keys</span><a id="helpbtn" style="cursor:pointer;color:var(--vscode-textLink-foreground)">Show shortcuts (?)</a>
 </div>
 <div id="main"><div id="groups"></div><div id="free" style="display:none"></div><div id="empty"><b>No agents here yet.</b><br>Start a Claude Code chat and it appears on the map, or change the filter.</div></div>
+<div id="traybar"><button id="traybtn" class="ghost" aria-controls="dock panel"></button><span id="traysum"></span></div>
 <div id="dock"></div>
 <div id="panel">
   <div class="pcard">
@@ -332,7 +347,7 @@
   in <i>Free</i> layout: drag to move it (positions are remembered)<br>
   <b>Keys</b> (with one selected)<br>
   <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>M</kbd> message · <kbd>R</kbd> rename ·
-  <kbd>D</kbd> description · <kbd>K</kbd> keep alive · <kbd>Del</kbd> trash · <kbd>/</kbd> filter · <kbd>Esc</kbd> clear · <kbd>?</kbd> this help
+  <kbd>D</kbd> description · <kbd>K</kbd> keep alive · <kbd>Del</kbd> trash · <kbd>B</kbd> roll the bottom bar up/down · <kbd>/</kbd> filter · <kbd>Esc</kbd> clear · <kbd>?</kbd> this help
 </div>
 <script nonce="{{nonce}}">
 const vscode = acquireVsCodeApi();
@@ -343,6 +358,8 @@ if (typeof Critters === 'undefined') {   // critters.js not loaded: plain circle
 const $ = (id) => document.getElementById(id);
 // simple line icons, drawn for CrewMon (16x16 grid)
 const ICONS = {
+  up: '<path d="M3.5 10 8 5.5l4.5 4.5"/>',
+  down: '<path d="M3.5 6 8 10.5 12.5 6"/>',
   open: '<path d="M9 3h4v4"/><path d="M13 3 7.5 8.5"/><path d="M11 9.5V13H3V5h3.5"/>',
   rename: '<path d="M10.5 2.5 13.5 5.5 6 13H3v-3z"/><path d="M9 4l3 3"/>',
   note: '<path d="M4 2h6l3 3v9H4z"/><path d="M10 2v3h3"/><path d="M6 8h5M6 10.5h5"/>',
@@ -609,9 +626,25 @@ function select(id, add) {
   persist(); render();
 }
 function clearSel() { selected.clear(); persist(); render(); }
+let trayUp = document.body.dataset.tray === 'up';      // rolled down unless you left it rolled up
+function setTray(up) {
+  trayUp = up; post({ type: 'tray', up });
+  renderPanel(); drawArrows();
+}
+function renderTray(list) {
+  document.body.classList.toggle('traydown', !trayUp);
+  const b = $('traybtn');
+  b.innerHTML = ic(trayUp ? 'down' : 'up') + '<span>' + (trayUp ? 'Roll down' : 'Roll up') + '</span>';
+  b.title = (trayUp ? 'Roll down' : 'Roll up') + ' the dock, agent card and message bar (B)';
+  b.setAttribute('aria-expanded', String(trayUp));
+  const one = list.length === 1 ? list[0] : null;
+  $('traysum').innerHTML = trayUp ? '' : one ? '<b>' + esc(one.title) + '</b> · ' + esc(one.needsYou ? 'needs you' : one.state)
+    : list.length ? '<b>' + list.length + ' agents selected</b>' : 'Select an agent, or roll up for the dock';
+}
 function sel() { return [...selected].map(byId).filter(Boolean); }
 function renderPanel() {
   const list = sel(), p = $('panel');
+  renderTray(list);
   if (!list.length) { p.style.display = 'none'; return; }
   p.style.display = 'block';
   const one = list.length === 1 ? list[0] : null;
@@ -644,6 +677,7 @@ function renderPanel() {
   }
   const conv = one ? active.find(x => x.a === one.id || x.b === one.id) : null;
   $('pconvo').hidden = !conv;
+  if (!trayUp && !conv) p.style.display = 'none';      // rolled down: only a conversation in progress stays visible
   if (conv) { $('pconvo').innerHTML = '<span>' + convoText(conv) + '</span>' + convoActions(conv); wireConvoButtons($('pconvo')); }
   $('pmsg').placeholder = one ? 'Message ' + one.title.slice(0, 40) + '…  (Enter)' : 'Message all ' + list.length + ' agents…  (Enter)';
   $('psend').innerHTML = ic('send') + '<span>' + (one ? 'Send' : 'Send to all') + '</span>';
@@ -666,6 +700,7 @@ function keepAlive(s) {
   if (s.hosts.includes('vscode')) post({ type: 'keeper', action: 'watch', id: s.id });
   else post({ type: 'keeper', action: 'hold', id: s.id });
 }
+$('traybtn').onclick = () => setTray(!trayUp);
 $('psend').onclick = () => send($('pmsg').value);
 $('pmsg').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); send($('pmsg').value); } if (e.key === 'Escape') $('pmsg').blur(); e.stopPropagation(); });
 
@@ -714,6 +749,7 @@ function onMove(ev) {
   if (t && t.node) t.node.classList.add('drop');
 }
 function onUp(ev) {
+  const t = drag.moved ? targetAt(ev.clientX, ev.clientY) : null;    // read it before the drag ends: the rolled-down dock hides then
   const d = drag; drag = null; document.body.classList.remove('dragging');
   d.node.removeEventListener('pointermove', onMove);
   $('ghost').style.display = 'none';
@@ -724,7 +760,6 @@ function onUp(ev) {
     lastClick = { id: d.s.id, t: now };
     select(d.s.id, d.add); return;
   }
-  const t = targetAt(ev.clientX, ev.clientY);
   const ids = selected.has(d.s.id) && selected.size > 1 ? [...selected] : [d.s.id];
   if (t && t.zone) {
     const z = t.zone.dataset.zone;
@@ -930,6 +965,7 @@ document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   const list = shown(); const one = sel().length === 1 ? sel()[0] : null;
   if (e.key === '/') { e.preventDefault(); $('q').focus(); return; }
+  if (e.key.toLowerCase() === 'b' && !e.ctrlKey && !e.metaKey && !e.altKey) { setTray(!trayUp); return; }
   if (e.key === '?') { $('help').style.display = $('help').style.display === 'block' ? 'none' : 'block'; return; }
   if (e.key === 'Escape') { $('menu').style.display = 'none'; $('help').style.display = 'none'; toggleView(false); toggleAct(false); toggleInbox(false); clearSel(); return; }
   if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
@@ -957,7 +993,7 @@ document.addEventListener('keydown', (e) => {
   if (!one) return;
   const k = e.key.toLowerCase();
   if (e.key === 'Enter') post({ type: 'open', id: one.id });
-  else if (k === 'm') { e.preventDefault(); $('pmsg').focus(); }
+  else if (k === 'm') { e.preventDefault(); if (!trayUp) setTray(true); $('pmsg').focus(); }
   else if (k === 'r') post({ type: 'rename', id: one.id, title: one.title, file: one.file });
   else if (k === 'd') post({ type: 'role', id: one.id, title: one.title, desc: role(one) });
   else if (k === 'k') keepAlive(one);

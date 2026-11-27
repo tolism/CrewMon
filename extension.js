@@ -524,11 +524,11 @@ async function keeperAction(m) {
   push();
 }
 
-function html(webview, root) {
+function html(webview, root, trayUp) {
   const nonce = crypto.randomBytes(16).toString('hex');
   const page = fs.readFileSync(path.join(root, 'media', 'map.html'), 'utf8');
   const critters = webview.asWebviewUri(vscode.Uri.file(path.join(root, 'media', 'critters.js'))).toString();
-  return page.replace(/\{\{nonce\}\}/g, nonce).replace(/\{\{csp\}\}/g, webview.cspSource).replace(/\{\{critters\}\}/g, critters);
+  return page.replace(/\{\{nonce\}\}/g, nonce).replace(/\{\{csp\}\}/g, webview.cspSource).replace(/\{\{critters\}\}/g, critters).replace(/\{\{tray\}\}/g, trayUp ? 'up' : 'down');
 }
 
 async function openChat(id, prompt) {
@@ -551,9 +551,10 @@ function open(context) {
     { enableScripts: true, retainContextWhenHidden: true,
       localResourceRoots: [vscode.Uri.file(path.join(context.extensionPath, 'media'))] });
   panel.iconPath = vscode.Uri.file(path.join(context.extensionPath, 'media', 'icon.png'));
-  panel.webview.html = html(panel.webview, context.extensionPath);
+  panel.webview.html = html(panel.webview, context.extensionPath, context.globalState.get('trayUp', false));
   panel.webview.onDidReceiveMessage(async (m) => {
     if (m.type === 'ready' || m.type === 'refresh') push();
+    else if (m.type === 'tray') await context.globalState.update('trayUp', !!m.up);
     else if (m.type === 'open') await openChat(m.id);
     else if (m.type === 'message') await openChat(m.id, m.text);
     else if (m.type === 'keeper') await keeperAction(m);

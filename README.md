@@ -96,6 +96,9 @@ status of the keeper and the messenger.
 **message bar** with the **quick chips**. Shift- or Ctrl-click to select several agents; the message goes to all of
 them.
 
+The dock, card and message bar start **rolled down** to one slim line. **Roll up** (or **B**) opens them, **M** opens them
+to type a message, and dragging an agent shows the dock anyway. CrewMon remembers how you left it.
+
 ### Drag and drop
 - **Onto another critter** (or use **Hand over…** / **Ask…** in the agent card, or the right-click menu, and pick
   the other agent from a list):
