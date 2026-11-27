@@ -292,6 +292,18 @@
   .bitem .acts button:hover { color: var(--fg); }
   .bitem .acts .ico { width: 13px; height: 13px; }
   .bitem.live { color: var(--busy); } .bitem.live.ask { color: var(--alert); }
+  .bjob { display: flex; gap: 8px; align-items: flex-start; padding: 4px 6px; border-radius: 6px; }
+  .bjob .ji { width: 16px; text-align: center; flex: none; font-weight: 700; }
+  .bjob.running .ji { color: var(--busy); animation: spin 1.6s linear infinite; display: inline-block; }
+  .bjob.completed .ji { color: var(--idle); } .bjob.failed .ji { color: var(--alert); } .bjob.stopped .ji, .bjob.unknown .ji { color: var(--muted); }
+  .bjob .jt { flex: 1; min-width: 0; line-height: 1.35; overflow-wrap: anywhere; }
+  .bjob .jm { color: var(--muted); font-size: 11px; }
+  .bjob:not(.running):not(.unknown) .jt > span:first-child { color: var(--muted); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .bjob.running .ji { animation: none; } }
+  #board .reply { margin-top: 10px; border-left: 3px solid var(--idle); background: var(--soft, rgba(127,127,127,.12)); border-radius: 6px; padding: 7px 10px; }
+  #board .reply.wait { border-left-color: var(--busy); color: var(--muted); }
+  #board .reply b { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 3px; }
   .bempty { color: var(--muted); font-size: 11.5px; padding: 2px 6px; }
   #board .add { display: flex; gap: 6px; margin-top: 12px; }
   #board .add input { flex: 1; min-width: 0; }
@@ -436,7 +448,9 @@ const base = (p) => (p || '').split('/').filter(Boolean).pop() || '';
 const tilde = (p) => (p || '').replace(/^\/home\/[^/]+/, '~');
 const post = (m) => vscode.postMessage(m);
 
-let boards = {}, boardOpen = '', boardDoneOpen = false;
+let boards = {}, boardOpen = '', boardDoneOpen = false, boardJobsOpen = false;
+let replyAt = {};
+const boardSent = {};    // id -> {at, what}: you sent something from the board; the reply shows under it
 let sessions = [], keeper = null, chips = [], replies = {}, messengerOn = false, messengerStatus = 'off', active = [], activity = [];
 const saved = vscode.getState() || {};
 let layout = saved.layout || 'grouped';
@@ -766,6 +780,8 @@ function boardLine(s, b) {
   const n = (sec) => b.items.filter(x => x.section === sec).length;
   const now = b.items.find(x => x.section === 'now');
   const parts = [now ? 'Now: ' + now.text : s.state === 'busy' && s.activity ? 'Now: ' + s.activity : ''];
+  const run = b.jobs ? b.jobs.running.filter(j => j.status === 'running').length : 0;
+  if (run) parts.push('⟳ ' + run + ' running');
   if (n('waiting') || s.needsYou) parts.push((n('waiting') + (s.needsYou ? 1 : 0)) + ' waiting on you');
   parts.push(n('next') + ' next', n('done') + ' done');
   return '▦ ' + parts.filter(Boolean).join(' · ');
@@ -813,7 +829,23 @@ function renderBoard() {
     '<div class="tools"><button class="ghost" id="bsync"' + (b.syncing ? ' disabled' : '') + '>' + ic('sync') + 'Sync now</button>' +
     '<button class="ghost" id="bcopy">' + ic('copy') + 'Copy</button><button class="ghost" id="buntrack" title="Stop tracking; the board is kept">' + ic('x') + 'Untrack</button></div>' +
     '<div class="vision" id="bvision" title="Click to edit">' + '<b>Vision</b>' + (b.vision ? esc(b.vision) : '<span class="ph">the longer-term goal, in one line (click to write)</span>') + '</div>';
+  const jobs = b.jobs || { running: [], recent: [] };
+  const kindName = { command: 'command', subagent: 'helper agent', workflow: 'workflow', monitor: 'watcher' };
+  const since = (t) => t ? ago(Math.max(1, Math.round((Date.now() - t) / 1000))) : '';
+  const job = (j) => {
+    const icon = { running: '⟳', completed: '✓', failed: '✗', stopped: '■', unknown: '?' }[j.status] || '•';
+    const when = j.status === 'running' ? 'started ' + since(j.started) : j.status === 'unknown' ? 'its chat is closed, so it is probably not running' :
+      { completed: 'finished', failed: 'failed', stopped: 'stopped' }[j.status] + ' ' + since(j.ended);
+    const extra = j.last ? 'latest: ' + j.last : j.status !== 'running' && j.result ? j.result : '';
+    return '<div class="bjob ' + j.status + '" title="' + esc(j.title) + '"><span class="ji" aria-hidden="true">' + icon + '</span><div class="jt"><span>' + esc(j.title || kindName[j.kind]) + '</span>' +
+      '<div class="jm">' + esc(kindName[j.kind] + ' · ' + when) + (extra ? ' · ' + esc(extra) : '') + '</div></div></div>';
+  };
+  const runningHTML = (jobs.running.length || jobs.recent.length) ? '<div class="bsec jobs"><h4 title="Commands, helper agents, workflows and watchers it started in the background">Running in the background <span class="n">' +
+    jobs.running.length + '</span></h4>' + (jobs.running.length ? jobs.running.map(job).join('') : '<div class="bempty">nothing running right now</div>') +
+    (jobs.recent.length ? '<div class="bempty" id="bjobs" style="cursor:pointer" title="Show or hide">' + (boardJobsOpen ? '▾' : '▸') + ' finished in the last 6 hours (' + jobs.recent.length + ')</div>' +
+      (boardJobsOpen ? jobs.recent.map(job).join('') : '') : '') + '</div>' : '';
   for (const [sec, label] of SECS) {
+    if (sec === 'waiting') html += runningHTML;
     let items = b.items.filter(x => x.section === sec).sort((p, q) => (q.pinned - p.pinned) || (sec === 'done' ? q.at - p.at : p.at - q.at));
     const live = [];
     if (sec === 'now' && s.state === 'busy' && s.activity) live.push('<div class="bitem live" title="Live, from what it is doing this second">▶ <div class="tx">' + esc(s.activity) + '</div></div>');
@@ -827,14 +859,20 @@ function renderBoard() {
   }
   html += '<div class="add"><input type="text" id="badd" placeholder="Add an item…  (Enter)" aria-label="New item"><select id="baddsec" aria-label="Section">' +
     SECS.filter(([k]) => k !== 'done').map(([k, l]) => '<option value="' + k + '"' + (k === 'next' ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></div>' +
-    '<div class="foot"><button class="ghost" id="bsendnext" title="Fill the message bar with your Next items; you press Send">' + ic('send') + 'Send Next to agent</button>' +
-    '<button class="ghost" id="bcheck" title="Fill the message bar with the board and ask the agent to correct it; you press Send">' + ic('ask') + 'Check with agent</button></div>';
+    '<div class="foot"><button class="ghost" id="bsendnext" title="Sends your Next items to the agent now; its reply shows here">' + ic('send') + 'Send Next to agent</button>' +
+    '<button class="ghost" id="bcheck" title="Sends the board to the agent and asks it to correct it; its reply shows here">' + ic('ask') + 'Check with agent</button></div>';
+  const sent = boardSent[s.id];
+  const reply = replies[s.id] && (!sent || (replyAt[s.id] || 0) > sent.at) ? replies[s.id] : '';   // only an answer that came after you sent
+  if (sent && !reply) html += '<div class="reply wait"><b>Sent: ' + esc(sent.what) + '</b>' +
+    (messengerOn ? 'Waiting for its reply… it appears here and over the critter.' : 'The chat opened with the message typed in: press Enter there to send it.') + '</div>';
+  else if (reply) html += '<div class="reply"><b>Its latest reply</b>' + esc(reply) + '</div>';
   el.innerHTML = html;
   const id = s.id;
   $('bclose').onclick = closeBoard;
   $('bsync').onclick = () => { bpost('sync'); b.syncing = true; renderBoard(); };
   $('bcopy').onclick = () => bpost('copy');
   $('buntrack').onclick = () => bpost('untrack');
+  if ($('bjobs')) $('bjobs').onclick = () => { boardJobsOpen = !boardJobsOpen; renderBoard(); };
   if ($('bdone')) $('bdone').onclick = () => { boardDoneOpen = !boardDoneOpen; renderBoard(); };
   el.querySelectorAll('[data-open]').forEach(x => x.onclick = () => post({ type: 'open', id }));
   $('bvision').onclick = () => editInline($('bvision'), b.vision, (t) => bpost('vision', { text: t }), 'The longer-term goal, in one line');
@@ -843,15 +881,20 @@ function renderBoard() {
     if (e.key === 'Enter' && $('badd').value.trim()) { bpost('add', { text: $('badd').value.trim(), section: $('baddsec').value }); $('badd').value = ''; }
     if (e.key === 'Escape') $('badd').blur();
   });
+  const sendNow = (what, text) => {
+    post({ type: 'send', ids: [id], text });
+    boardSent[id] = { at: Date.now(), what };
+    renderBoard();
+  };
   $('bsendnext').onclick = () => {
     const next = b.items.filter(x => x.section === 'next');
-    if (!next.length) { prefill(id, 'What comes next, in 3 lines?'); return; }
-    prefill(id, 'From my board, the next steps are: ' + next.map((x, i) => (i + 1) + ') ' + x.text).join('; ') + '. Continue with these, in this order.');
+    if (!next.length) { sendNow('asked what comes next', 'What comes next? Answer in 3 lines.'); return; }
+    sendNow('your ' + next.length + ' next step' + (next.length > 1 ? 's' : ''), 'From my board, the next steps are: ' + next.map((x, i) => (i + 1) + ') ' + x.text).join('; ') + '. Continue with these, in this order, and first reply in one line with what you start on.');
   };
   $('bcheck').onclick = () => {
     const name = { now: 'now', waiting: 'waiting on me', next: 'next', later: 'later' };
     const open = b.items.filter(x => x.section !== 'done').map(x => x.text + ' (' + name[x.section] + ')').join('; ');
-    prefill(id, 'This is how I see your work right now: ' + (b.vision ? 'goal: ' + b.vision + '. ' : '') + (open || 'nothing open') +
+    sendNow('the board, to check', 'This is how I see your work right now: ' + (b.vision ? 'goal: ' + b.vision + '. ' : '') + (open || 'nothing open') +
       '. Correct anything that is wrong or missing, in at most 5 lines. Do not start new work.');
   };
   el.querySelectorAll('.bitem[data-item]').forEach(row => {
@@ -1204,7 +1247,7 @@ window.addEventListener('message', (e) => {
     sessions = m.data.sessions || []; keeper = m.data.keeper || null; chips = m.data.chips || [];
     if (m.data.critter && m.data.critter !== defaultStyle) { defaultStyle = m.data.critter; renderLegend(); }
     $('style').value = critterStyle();
-    replies = m.data.replies || {}; messengerOn = !!m.data.messenger; messengerStatus = m.data.messengerStatus || 'off'; active = m.data.active || [];
+    replies = m.data.replies || {}; replyAt = m.data.replyAt || {}; messengerOn = !!m.data.messenger; messengerStatus = m.data.messengerStatus || 'off'; active = m.data.active || [];
     activity = m.data.activity || []; if (!$('act').hidden) renderActivity();
     drive = m.data.drive || drive; if (!$('inbox').hidden) renderInbox();
     boards = m.data.boards || {};

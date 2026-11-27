@@ -113,8 +113,11 @@ the card shows one line (*Now: … · 1 waiting on you · 2 next*), and **Board*
   its own to-do list, that list is used as is.
 - **Your items stay yours**: what you add, edit or pin is never reworded or moved by the sync; it can only be ticked
   done. What you delete never comes back. *Done* without proof shows as *probably*.
-- **Talk to the agent from it**: *Ask* on an item, *Send Next to agent* and *Check with agent* fill the message bar,
-  and you press Send. **Sync now**, **Copy** (as Markdown) and **Untrack** (the board is kept) are at the top.
+- **Running in the background**: the commands, helper agents, workflows and watchers it started, with how long they
+  have run (⟳), and what finished in the last 6 hours (✓ done, ✗ failed, ■ stopped). Read straight from the chat, no AI.
+- **Talk to the agent from it**: *Send Next to agent* and *Check with agent* send at once, and its reply shows under
+  the buttons; the board then updates itself. *Ask* on an item fills the message bar for you to finish.
+  **Sync now**, **Copy** (as Markdown) and **Untrack** (the board is kept) are at the top.
 - Design and rules: [docs/BOARD.md](docs/BOARD.md).
 
 ### Drag and drop

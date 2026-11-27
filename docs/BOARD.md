@@ -35,13 +35,21 @@ and draws the board. Nothing is sent to an agent unless you click.
 - At most 6 new items per sync; near-duplicates are merged.
 - Untrack keeps the board file; Track again brings it back.
 
+## Running in the background
+
+Read straight from the chat, no AI: every command started with `run_in_background`, helper agent (async subagent),
+workflow and watcher (Monitor) has a start and a finish record (`completed`, `failed`, `stopped`) that points back to
+it. The board shows what is running and for how long, the latest event of a watcher, and what finished in the last 6
+hours. When the chat is closed, anything still marked running is shown as *probably not running*. Finished work is
+also given to the sync as proof for *Done*.
+
 ## Talking to the agent (only when you click)
 
-- **Ask** on an item: the message bar opens with that item filled in.
-- **Send Next**: the message bar opens with your *Next* items as a numbered list.
-- **Check with agent**: the message bar opens with the board, asking the agent to correct it in a few lines.
+- **Send Next to agent** and **Check with agent** send at once (through the messenger) and show *Waiting for its
+  reply…*; only an answer that arrives after you sent counts, and the board re-syncs when it arrives.
+- **Ask** on an item fills the message bar with that item, for you to finish and send.
 
-You still press Send, so the agent is never interrupted by the board itself.
+Nothing is ever sent by the board on its own.
 
 ## Files
 

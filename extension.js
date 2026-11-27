@@ -135,11 +135,12 @@ function autoResend(active, lines) {
 }
 let lastSessions = [];
 function readInbox() {
-  const replies = {}, now = Date.now();
+  const replies = {}, replyAt = {}, now = Date.now();
   let lines = [];
   try { lines = fs.readFileSync(path.join(MSG_DIR, 'inbox.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch (_) { /* none yet */ }
   for (const x of lines) {
-    if (x.kind === 'reply' && x.session && now - x.at < 30 * 60e3) replies[x.session] = (x.text || '').slice(0, 300);
+    if (x.kind === 'reply' && x.session && now - x.at < 30 * 60e3) { replies[x.session] = (x.text || '').slice(0, 300); replyAt[x.session] = x.at; }
+    if (x.at > inboxSeen && x.kind === 'reply' && x.session && Board.load(x.session)) boardForce.add(x.session);   // a tracked agent answered: bring its board up to date
     if (x.at > inboxSeen && x.kind === 'drive-uploaded') {
       let d = {}; try { d = JSON.parse(x.text); } catch (_) { /* */ }
       const pick = pickupText(d.title, d.url, d.zip);
@@ -196,7 +197,7 @@ function readInbox() {
   autoResend(active, lines);
   let drive = null;
   try { drive = JSON.parse(fs.readFileSync(path.join(MSG_DIR, 'drive.json'), 'utf8')); } catch (_) { /* not listed yet */ }
-  return { replies, active, activity, drive };
+  return { replies, replyAt, active, activity, drive };
 }
 
 // ---- Google Drive hand-overs ----
@@ -471,10 +472,23 @@ async function boardAction(m) {
   }
   push();
 }
-function boardsForView() {
+const jobCache = new Map();         // id -> {key, val}: background work, re-read only when the chat grows (or once a minute)
+function jobsOf(s) {
+  const key = s.size + ':' + (s.state === 'offline') + ':' + Math.floor(Date.now() / 60e3);
+  const c = jobCache.get(s.id);
+  if (c && c.key === key) return c.val;
+  let val = { running: [], recent: [] };
+  try { val = Board.jobs(s.file, { offline: s.state === 'offline' }); } catch (_) { /* unreadable: show none */ }
+  jobCache.set(s.id, { key, val });
+  return val;
+}
+function boardsForView(sessions) {
   const out = {};
-  for (const b of Object.values(Board.all())) if (b.tracked)
-    out[b.id] = { vision: b.vision, items: b.items, syncedAt: b.syncedAt, lastError: b.lastError, syncing: boardBusy === b.id };
+  for (const b of Object.values(Board.all())) if (b.tracked) {
+    const s = (sessions || []).find(x => x.id === b.id);
+    out[b.id] = { vision: b.vision, items: b.items, syncedAt: b.syncedAt, lastError: b.lastError, syncing: boardBusy === b.id,
+      jobs: s && s.file ? jobsOf(s) : { running: [], recent: [] } };
+  }
   return out;
 }
 
@@ -589,10 +603,11 @@ async function push() {
   lastSessions = data.sessions || [];
   const ib = readInbox();
   data.replies = ib.replies;
+  data.replyAt = ib.replyAt;
   data.active = ib.active;
   data.activity = ib.activity;
   data.drive = ib.drive;
-  data.boards = boardsForView();
+  data.boards = boardsForView(data.sessions);
   const slim = Object.assign({}, data, { sessions: (data.sessions || []).map(s => Object.assign({}, s, { summary: undefined })) });
   if (panel) panel.webview.postMessage({ type: 'data', data: slim });
 }

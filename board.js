@@ -116,6 +116,8 @@ function excerpt(file, from) {
     const m = r.message, c = m && m.content;
     if (r.type === 'user' && m && m.role === 'user') {
       const t = textOf(m);
+      const nt = /<task-notification>[\s\S]*?<status>(\w+)<\/status>[\s\S]*?<summary>([\s\S]*?)<\/summary>/.exec(t);
+      if (nt) { out.push('FINISHED (' + nt[1] + ') ' + clean(nt[2], 200)); continue; }
       if (/^(This session is being continued|.{0,40}Primary Request and Intent)/.test(t)) {
         const parts = []; let p; SUMMARY_PARTS.lastIndex = 0;
         while ((p = SUMMARY_PARTS.exec(String(typeof c === 'string' ? c : textOf(m)))) && parts.length < 3) parts.push(p[1] + ': ' + clean(p[2], 900));
@@ -226,6 +228,64 @@ function parseReply(out) {
   return j.ops;
 }
 
+// ---- background work: commands, subagents, workflows, monitors (no AI) ----
+const JOB_TOOLS = { Bash: 'command', Agent: 'subagent', Task: 'subagent', Workflow: 'workflow', Monitor: 'monitor' };
+function jobs(file, opts) {
+  const o = opts || {};
+  const st = fs.statSync(file);
+  const start = Math.max(0, st.size - (o.bytes || 8 * 1024 * 1024));
+  const fd = fs.openSync(file, 'r'); const buf = Buffer.alloc(st.size - start); fs.readSync(fd, buf, 0, buf.length, start); fs.closeSync(fd);
+  let text = buf.toString('utf8'); if (start > 0) text = text.slice(text.indexOf('\n') + 1);
+  const byUse = new Map(), byTask = new Map();
+  const finish = (j, status, at, summary) => {
+    if (!j || j.status !== 'running') return;
+    j.status = status; j.ended = at;
+    const r = clean(String(summary || '').replace(/^(Background command|Monitor|Dynamic workflow|Workflow|Agent|Subagent)\s+"[^"]*"\s*/i, ''), 200);
+    if (r) j.result = r;
+  };
+  for (const line of text.split('\n')) {
+    if (!line.includes('tool_use') && !line.includes('task-notification') && !line.includes('tool_result')) continue;
+    let r; try { r = JSON.parse(line); } catch (_) { continue; }
+    const at = r.timestamp ? Date.parse(r.timestamp) : 0, c = r.message && r.message.content;
+    const blocks = Array.isArray(c) ? c : typeof c === 'string' ? [{ type: 'text', text: c }] : [];
+    for (const b of blocks) {
+      if (!b) continue;
+      if (b.type === 'tool_use' && JOB_TOOLS[b.name]) {
+        const i = b.input || {};
+        if (b.name === 'Bash' && !i.run_in_background) continue;
+        byUse.set(b.id, { use: b.id, kind: JOB_TOOLS[b.name], title: clean(i.description || i.prompt || i.command || (i.script || '').replace(/[\s\S]*?description:\s*['"]([^'"]+)[\s\S]*/, '$1'), 90),
+          started: at, status: 'running', sync: b.name === 'Agent' && !i.run_in_background });
+      } else if (b.type === 'tool_result') {
+        const j = byUse.get(b.tool_use_id);
+        const t = typeof b.content === 'string' ? b.content : JSON.stringify(b.content || '');
+        if (j) {
+          const id = /background with ID: (\w+)|agentId: (\w+)|Task ID: (\w+)|Monitor started \(task (\w+)/.exec(t);
+          if (id) { j.task = id.slice(1).find(Boolean); byTask.set(j.task, j); }
+          else if (b.is_error) finish(j, 'failed', at, t.replace(/<[^>]+>/g, ' '));
+          else finish(j, 'completed', at, '');      // it ran in the foreground after all (or a subagent that waited)
+        }
+        const stop = /Successfully stopped task: (\w+)/.exec(t);
+        if (stop) finish(byTask.get(stop[1]), 'stopped', at, 'stopped');
+      } else if (b.type === 'text' && b.text && b.text.includes('<task-notification>')) {
+        for (const n of b.text.split('<task-notification>').slice(1)) {
+          const g = (tag) => { const x = new RegExp('<' + tag + '>([\\s\\S]*?)</' + tag + '>').exec(n); return x ? x[1].trim() : ''; };
+          const j = byUse.get(g('tool-use-id')) || byTask.get(g('task-id'));
+          if (!j) continue;
+          const status = g('status');
+          if (status) finish(j, status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : 'stopped', at, g('summary'));
+          else { j.last = clean(g('summary') || g('event') || n.replace(/<[^>]+>/g, ' '), 140); j.lastAt = at; }   // a monitor's event
+        }
+      }
+    }
+  }
+  const now = o.now || Date.now();
+  const list = [...byUse.values()].filter(j => !(j.sync && j.status !== 'running'));
+  if (o.offline) for (const j of list) if (j.status === 'running') { j.status = 'unknown'; j.result = 'the chat is not running'; }
+  const running = list.filter(j => j.status === 'running' || j.status === 'unknown').sort((a, b) => b.started - a.started);
+  const recent = list.filter(j => j.status !== 'running' && j.status !== 'unknown' && now - (j.ended || 0) < (o.recentMs || 6 * 3600e3)).sort((a, b) => b.ended - a.ended);
+  return { running: running.slice(0, 12), recent: recent.slice(0, 8) };
+}
+
 // Should this tracked agent sync now? New turns, idle (or forced), and not too soon.
 function due(b, s, now) {
   if (!b || !b.tracked || !s || !s.file) return false;
@@ -234,4 +294,4 @@ function due(b, s, now) {
   return (now || Date.now()) - (b.lastTry || 0) >= MIN_GAP_MS;
 }
 
-module.exports = { SECTIONS, dir, fileOf, empty, load, save, all, userEdit, excerpt, applyTodos, applyOps, prompt, parseReply, due, similar, norm, MIN_GAP_MS };
+module.exports = { jobs, SECTIONS, dir, fileOf, empty, load, save, all, userEdit, excerpt, applyTodos, applyOps, prompt, parseReply, due, similar, norm, MIN_GAP_MS };

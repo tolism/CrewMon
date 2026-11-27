@@ -43,7 +43,15 @@ module.exports = {
     { id: 'demo1', title: 'Hand-over from Payments API v2 · 2026-11-20', modified: '2026-11-20T09:41:00Z', description: 'CrewMon hand-over, not picked up yet', url: 'https://docs.google.com/document/d/demo1/edit' },
     { id: 'demo2', title: 'Hand-over from Release notes 2.4 · 2026-11-18', modified: '2026-11-18T16:05:00Z', description: 'Picked up by "Docs search" on 2026-11-19 08:12', url: 'https://docs.google.com/document/d/demo2/edit' } ] },
   messenger: true, messengerStatus: 'on', critter: 'bot',
-  boards: { 'a1f3c9d2-1': { vision: 'A checkout that works with every payment provider, fully tested', syncedAt: now - 240e3, syncing: false, lastError: '', items: [
+  boards: { 'a1f3c9d2-1': { jobs: {
+    running: [
+      { kind: 'command', title: 'Run the full checkout test suite', status: 'running', started: now - 720e3 },
+      { kind: 'subagent', title: 'Review the payment form for accessibility', status: 'running', started: now - 180e3 },
+      { kind: 'monitor', title: 'Watch the test log', status: 'running', started: now - 700e3, last: '212 of 340 tests passed' } ],
+    recent: [
+      { kind: 'workflow', title: 'Check every page in three browsers', status: 'completed', started: now - 5400e3, ended: now - 3000e3, result: 'completed: 18 pages, no problems' },
+      { kind: 'command', title: 'Build the production bundle', status: 'failed', started: now - 2400e3, ended: now - 2300e3, result: 'failed with exit code 1' } ] },
+    vision: 'A checkout that works with every payment provider, fully tested', syncedAt: now - 240e3, syncing: false, lastError: '', items: [
     { id: 'b1', section: 'now', text: 'Fix the card-expiry validation test', src: 'auto', at: now - 300e3 },
     { id: 'b2', section: 'waiting', text: 'Which provider goes first: Stripe or Adyen?', src: 'auto', at: now - 900e3 },
     { id: 'b3', section: 'next', text: 'Hand the design tokens to the tokens agent', src: 'auto', at: now - 800e3 },
