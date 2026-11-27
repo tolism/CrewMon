@@ -11,5 +11,10 @@ const { chromium } = require('playwright');
     await page.screenshot({ path: path.join(__dirname, '..', '..', 'docs', out) });
     console.log('docs/' + out);
   }
+  await page.goto('file://' + path.join(__dirname, 'demo.html') + '?bg=city');   // the work board, open
+  await page.waitForTimeout(1200);
+  await page.keyboard.press('t'); await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(__dirname, '..', '..', 'docs', 'screenshot-board.png') });
+  console.log('docs/screenshot-board.png');
   await browser.close();
 })();

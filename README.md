@@ -20,6 +20,9 @@ are still running, and which you left days ago. CrewMon turns them into a small 
 - **❗ Needs you**: a red badge when an agent is waiting for your answer or approval.
 - **🧾 In charge of**: hover for a one-line description of each agent's job, written by AI from its own summary,
   or by you.
+- **▦ Work boards**: *Track* an agent and CrewMon keeps a board of its work, drawn from its chat:
+  **Now · Waiting on you · Next · Later · Done**, plus your **Vision** line. You add, tick, pin and move items; the
+  agent never has to keep it.
 - **💬 Message from the map**: select an agent, type, press Enter, or click a quick chip (*Status?*, *Continue*,
   *Summarise where you are*). Select several to message them all.
 - **🤝 Agent to agent**: drag one critter onto another to **hand over** work, **ask** a question, or let them
@@ -98,6 +101,21 @@ them.
 
 The dock, card and message bar start **rolled down** to one slim line. **Roll up** (or **B**) opens them, **M** opens them
 to type a message, and dragging an agent shows the dock anyway. CrewMon remembers how you left it.
+
+### Work boards
+Click **Track** on an agent's card (or press **T**, or right-click → *Track*). A board icon appears on its critter,
+the card shows one line (*Now: … · 1 waiting on you · 2 next*), and **Board** opens the drawer:
+
+<p align="center"><img src="docs/screenshot-board.png" width="900" alt="A work board: Vision, Now, Waiting on you, Next, Later and Done, next to the map"></p>
+
+- **The agent works the way it wants.** It is never told about the board. When it goes idle after new turns, a small
+  model (Haiku) reads what happened and proposes changes; CrewMon applies them under fixed rules. If the agent keeps
+  its own to-do list, that list is used as is.
+- **Your items stay yours**: what you add, edit or pin is never reworded or moved by the sync; it can only be ticked
+  done. What you delete never comes back. *Done* without proof shows as *probably*.
+- **Talk to the agent from it**: *Ask* on an item, *Send Next to agent* and *Check with agent* fill the message bar,
+  and you press Send. **Sync now**, **Copy** (as Markdown) and **Untrack** (the board is kept) are at the top.
+- Design and rules: [docs/BOARD.md](docs/BOARD.md).
 
 ### Drag and drop
 - **Onto another critter** (or use **Hand over…** / **Ask…** in the agent card, or the right-click menu, and pick
@@ -178,6 +196,7 @@ back.
 | `crewmon.days` | 7 | show agents active in the last N days |
 | `crewmon.refreshSeconds` | 5 | how often the map refreshes |
 | `crewmon.aiDescriptions` | true | write the one-line *In charge of* with a small model (Haiku), once per summary |
+| `crewmon.boardSync` | true | keep tracked agents' boards up to date with Haiku when they go idle after new turns |
 | `crewmon.quickMessages` | 6 chips | the one-click messages under the message bar |
 | `crewmon.driveBlockedFolders` | `[]` | folders whose agents may not hand over through Google Drive |
 | `crewmon.critter` | `bot` | how agents are drawn: `bot`, `blob` or `bug` (also in the top bar) |
@@ -191,7 +210,8 @@ back.
 - **Delete** asks first, refuses while the chat is open in VS Code, and moves the files to the keeper's trash
   (`keeper restore <id>` brings them back; `keeper purge` empties it for good).
 - AI descriptions are made with your own Claude login (`claude -p --model haiku`, no tools, nothing saved as a chat).
-  Turn them off with `crewmon.aiDescriptions`.
+  Turn them off with `crewmon.aiDescriptions`. Work boards use the same way, only for agents you track, and only
+  when they have new turns; `crewmon.boardSync` turns that off. Boards are kept in `~/.claude/crewmon/boards/`.
 - Messages sent through CrewMon are normal messages to your agents. They act on them with the permissions those chats
   already have.
 

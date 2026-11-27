@@ -43,5 +43,15 @@ module.exports = {
     { id: 'demo1', title: 'Hand-over from Payments API v2 · 2026-11-20', modified: '2026-11-20T09:41:00Z', description: 'CrewMon hand-over, not picked up yet', url: 'https://docs.google.com/document/d/demo1/edit' },
     { id: 'demo2', title: 'Hand-over from Release notes 2.4 · 2026-11-18', modified: '2026-11-18T16:05:00Z', description: 'Picked up by "Docs search" on 2026-11-19 08:12', url: 'https://docs.google.com/document/d/demo2/edit' } ] },
   messenger: true, messengerStatus: 'on', critter: 'bot',
+  boards: { 'a1f3c9d2-1': { vision: 'A checkout that works with every payment provider, fully tested', syncedAt: now - 240e3, syncing: false, lastError: '', items: [
+    { id: 'b1', section: 'now', text: 'Fix the card-expiry validation test', src: 'auto', at: now - 300e3 },
+    { id: 'b2', section: 'waiting', text: 'Which provider goes first: Stripe or Adyen?', src: 'auto', at: now - 900e3 },
+    { id: 'b3', section: 'next', text: 'Hand the design tokens to the tokens agent', src: 'auto', at: now - 800e3 },
+    { id: 'b4', section: 'next', text: 'Update the README for the new form', src: 'you', pinned: true, at: now - 700e3 },
+    { id: 'b5', section: 'later', text: 'Split the payment form into its own component', src: 'auto', at: now - 600e3 },
+    { id: 'b6', section: 'done', text: 'New payment form with validation', src: 'agent', evidence: 'commit 3fa2c1: payment form', at: now - 3600e3 },
+    { id: 'b7', section: 'done', text: 'API client for the payments service', src: 'auto', evidence: 'commit 9be410', at: now - 5000e3 },
+    { id: 'b8', section: 'done', text: 'Remove the old checkout page', src: 'auto', probable: true, at: now - 2000e3 },
+  ] } },
   active: [{ rid: 'demo', kind: 'handover', a: 'a1f3c9d2-1', b: 'c3a9f7e5-3', waiting: 'a1f3c9d2-1', step: 'note', turn: 0, rounds: 0, sentAt: now - 240e3, aTitle: 'Checkout flow redesign', bTitle: 'Design tokens update', waitingTitle: 'Checkout flow redesign', file: '' }],
 };

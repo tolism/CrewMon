@@ -10,6 +10,7 @@ const os = require('os');
 const { execFile, execFileSync } = require('child_process');
 const { snapshot, runningSessions, ROLES, AUTO, GROUPS } = require('./snapshot');
 const { claudeBin, tmuxBin } = require('./processes');
+const Board = require('./board');
 
 // The keeper (keeps chats running on the machine when VS Code closes them): ~/.local/bin/keeper, else the bundled copy.
 function keeperPath(root) {
@@ -380,6 +381,103 @@ async function handover(m) {
   }, 3000);
 }
 
+// ---- Work boards (docs/BOARD.md): CrewMon draws them from the chat; Haiku proposes changes, board.js applies them ----
+let boardBusy = '';                 // the session being synced
+const boardForce = new Set();       // "Sync now" clicks
+function haikuEnv() {
+  const env = Object.assign({}, process.env);
+  for (const k of Object.keys(env)) if (k.startsWith('CLAUDE')) delete env[k];
+  return env;
+}
+function boardSync(sessions) {
+  if (boardBusy) return;
+  const boards = Board.all();
+  const now = Date.now();
+  for (const b of Object.values(boards)) {
+    if (!b.tracked) continue;
+    const s = sessions.find(x => x.id === b.id);
+    if (!s) continue;
+    const forced = boardForce.has(b.id);
+    if (!forced && !Board.due(b, s, now)) continue;
+    boardForce.delete(b.id);
+    runBoardSync(b, s);
+    return;                          // one at a time
+  }
+}
+function runBoardSync(b, s) {
+  let ex;
+  try { ex = Board.excerpt(s.file, b.syncedSize || 0); } catch (e) { b.lastError = 'could not read the chat: ' + e.message; Board.save(b); return; }
+  if (!b.syncedSize && s.summary) ex.text = 'SUMMARY ' + s.summary.replace(/\s+/g, ' ').slice(0, 2500) + '\n' + ex.text;
+  const fresh = Board.load(b.id) || b;
+  const todos = Board.applyTodos(fresh, ex.todos);
+  fresh.lastTry = Date.now();
+  const bin = claudeBin();
+  if (!cfg('boardSync', true) || !bin || !ex.text.trim()) {     // nothing for Haiku to read (or turned off): the agent's own list only
+    Object.assign(fresh, { syncedAt: Date.now(), syncedSize: ex.end, lastError: !bin && cfg('boardSync', true) ? 'Claude Code not found for the sync' : '' });
+    Board.save(fresh); push(); return;
+  }
+  Board.save(fresh);
+  boardBusy = b.id; push();
+  const cwd = path.dirname(AUTO);     // CrewMon's own folder: these helper runs are not drawn on the map
+  fs.mkdirSync(cwd, { recursive: true });
+  execFile(bin, ['-p', Board.prompt(fresh, ex), '--model', 'haiku', '--no-session-persistence', '--tools', '', '--strict-mcp-config',
+                 '--setting-sources', 'user'], { env: haikuEnv(), cwd, timeout: 120000, maxBuffer: 4 << 20 }, (err, stdout) => {
+    boardBusy = '';
+    const cur = Board.load(b.id) || fresh;           // your edits made while Haiku was thinking are kept
+    try {
+      if (err) throw new Error(err.killed ? 'Haiku took too long' : (err.message || String(err)).split('\n')[0]);
+      const r = Board.applyOps(cur, Board.parseReply(stdout));
+      Object.assign(cur, { syncedAt: Date.now(), syncedSize: ex.end, lastError: '', lastResult: r });
+    } catch (e) {
+      cur.lastError = String(e.message || e).slice(0, 200);    // syncedSize unchanged: the same turns are read again next time
+    }
+    Board.save(cur); push();
+  });
+}
+function boardMarkdown(b) {
+  const names = { now: 'Now', waiting: 'Waiting on you', next: 'Next', later: 'Later', done: 'Done' };
+  const out = ['# ' + (b.title || 'Board')];
+  if (b.vision) out.push('', 'Vision: ' + b.vision);
+  for (const sec of Board.SECTIONS) {
+    const items = b.items.filter(x => x.section === sec);
+    if (!items.length) continue;
+    out.push('', '## ' + names[sec]);
+    for (const x of items) out.push('- [' + (sec === 'done' ? 'x' : ' ') + '] ' + x.text + (x.evidence && sec === 'done' ? '  (' + x.evidence + ')' : '') + (x.probable ? '  (probably)' : ''));
+  }
+  return out.join('\n');
+}
+async function boardAction(m) {
+  let b = Board.load(m.id);
+  if (m.op === 'track') {
+    if (!b) b = Board.empty(m.id, m.title);
+    b.tracked = true; if (m.title) b.title = m.title;
+    Board.save(b); boardForce.add(m.id);
+    vscode.window.setStatusBarMessage(`CrewMon: tracking "${m.title}"; its board fills in a moment`, 5000);
+  } else if (!b) {
+    return;
+  } else if (m.op === 'untrack') {
+    const ok = await vscode.window.showInformationMessage(`Stop tracking "${b.title}"? Its board is kept; Track brings it back.`, { modal: true }, 'Stop tracking');
+    if (ok !== 'Stop tracking') return;
+    b.tracked = false; Board.save(b);
+  } else if (m.op === 'sync') {
+    if (boardBusy === m.id) return;
+    boardForce.add(m.id); boardSync(lastSessions);
+  } else if (m.op === 'copy') {
+    await vscode.env.clipboard.writeText(boardMarkdown(b));
+    vscode.window.setStatusBarMessage('CrewMon: board copied as Markdown', 3000);
+    return;
+  } else {
+    Board.userEdit(b, m); Board.save(b);
+  }
+  push();
+}
+function boardsForView() {
+  const out = {};
+  for (const b of Object.values(Board.all())) if (b.tracked)
+    out[b.id] = { vision: b.vision, items: b.items, syncedAt: b.syncedAt, lastError: b.lastError, syncing: boardBusy === b.id };
+  return out;
+}
+
 // ---- "In charge of" one-liners: made by a small model from each session's latest summary, cached in auto.json ----
 const describing = new Set();
 let describeBusy = false;
@@ -477,6 +575,7 @@ async function push() {
   const k = await runKeeper(extRoot, ['status', '--json']);
   try { data.keeper = k.ok ? JSON.parse(k.out) : null; } catch (_) { data.keeper = null; }
   describeQueue(data.sessions || []);
+  try { boardSync(data.sessions || []); } catch (e) { console.error('CrewMon board sync', e); }
   if (Date.now() - lastModCheck > 30000) { lastModCheck = Date.now(); messengerUpToDate(extRoot).catch(() => {}); }
   data.chips = cfg('quickMessages', DEFAULT_CHIPS);
   data.critter = cfg('critter', 'bot');
@@ -493,6 +592,7 @@ async function push() {
   data.active = ib.active;
   data.activity = ib.activity;
   data.drive = ib.drive;
+  data.boards = boardsForView();
   const slim = Object.assign({}, data, { sessions: (data.sessions || []).map(s => Object.assign({}, s, { summary: undefined })) });
   if (panel) panel.webview.postMessage({ type: 'data', data: slim });
 }
@@ -554,6 +654,7 @@ function open(context) {
   panel.webview.html = html(panel.webview, context.extensionPath, context.globalState.get('trayUp', false));
   panel.webview.onDidReceiveMessage(async (m) => {
     if (m.type === 'ready' || m.type === 'refresh') push();
+    else if (m.type === 'board') await boardAction(m);
     else if (m.type === 'tray') await context.globalState.update('trayUp', !!m.up);
     else if (m.type === 'open') await openChat(m.id);
     else if (m.type === 'message') await openChat(m.id, m.text);

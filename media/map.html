@@ -259,7 +259,52 @@
   @media (max-width: 700px) { body.traydown #traybar { padding-right: 18px; padding-bottom: 26px; } body.traydown #pconvo { padding-right: 0; padding-bottom: 24px; } }
   /* a narrow tab: the card's buttons go under the text instead of squeezing it */
   #panel .what { min-width: 0; flex: none; }
-  @media (max-width: 1250px) { .pcard { grid-template-columns: auto minmax(0, 1fr); } #panel .pcard .actions { grid-column: 1 / -1; justify-content: flex-start; } }
+  #panel { container-type: inline-size; }
+  @container (max-width: 1220px) { .pcard { grid-template-columns: auto minmax(0, 1fr); } #panel .pcard .actions { grid-column: 1 / -1; justify-content: flex-start; } }
+  /* work board drawer (docs/BOARD.md) */
+  #board { position: fixed; right: 0; bottom: 0; z-index: 30; width: min(460px, 94vw); background: var(--card); border-left: 1px solid var(--border);
+    box-shadow: -10px 0 28px rgba(0,0,0,.28); overflow: auto; padding: 12px 16px 16px; box-sizing: border-box; font-size: 12.5px; }
+  #board h3 { margin: 0; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+  #board h3 .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #board .sub { color: var(--muted); font-size: 11.5px; margin: 3px 0 8px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  #board .sub .err { color: var(--alert); }
+  #board .tools { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  #board .tools button { padding: 3px 8px; }
+  #board .vision { border: 1px dashed var(--border); border-radius: 8px; padding: 6px 9px; margin-bottom: 10px; cursor: text; }
+  #board .vision b { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-right: 6px; }
+  #board .vision .ph { color: var(--muted); font-style: italic; }
+  #board .bsec { margin: 10px 0 4px; }
+  #board .bsec h4 { margin: 0 0 4px; font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); display: flex; gap: 6px; align-items: center; cursor: default; }
+  #board .bsec h4 .n { background: var(--soft, rgba(127,127,127,.15)); border-radius: 999px; padding: 0 6px; letter-spacing: 0; }
+  #board .bsec.waiting h4 { color: var(--alert); } #board .bsec.now h4 { color: var(--busy); }
+  #board .bsec.done h4 { cursor: pointer; }
+  .bitem { display: flex; gap: 7px; align-items: flex-start; padding: 4px 6px; border-radius: 6px; }
+  .bitem:hover, .bitem:focus-within { background: var(--vscode-list-hoverBackground); }
+  .bitem input[type=checkbox] { margin: 2px 0 0; flex: none; cursor: pointer; }
+  .bitem .tx { flex: 1; min-width: 0; line-height: 1.35; overflow-wrap: anywhere; }
+  .bitem.done .tx { color: var(--muted); } .bitem.done.probable .tx { font-style: italic; }
+  .bitem .tags { display: inline-flex; gap: 4px; margin-left: 4px; vertical-align: 1px; }
+  .btag { font-size: 10px; border: 1px solid var(--border); border-radius: 999px; padding: 0 5px; color: var(--muted); white-space: nowrap; }
+  .btag.you { border-color: var(--accent); color: var(--fg); } .btag.agent { border-color: var(--idle); } .btag.prob { border-style: dashed; }
+  .bitem .acts { display: none; gap: 2px; flex: none; }
+  .bitem:hover .acts, .bitem:focus-within .acts { display: inline-flex; }
+  .bitem .acts button { padding: 1px 4px; background: transparent; color: var(--muted); border: 0; }
+  .bitem .acts button:hover { color: var(--fg); }
+  .bitem .acts .ico { width: 13px; height: 13px; }
+  .bitem.live { color: var(--busy); } .bitem.live.ask { color: var(--alert); }
+  .bempty { color: var(--muted); font-size: 11.5px; padding: 2px 6px; }
+  #board .add { display: flex; gap: 6px; margin-top: 12px; }
+  #board .add input { flex: 1; min-width: 0; }
+  #board .add select { background: var(--vscode-dropdown-background, var(--input)); color: var(--vscode-dropdown-foreground, var(--inputfg)); border: 1px solid var(--border); font: inherit; }
+  #board .foot { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+  #board .edit { width: 100%; box-sizing: border-box; }
+  .node .bmark { position: absolute; top: 24px; left: 26px; width: 18px; height: 18px; border-radius: 5px; background: var(--card); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; color: var(--fg); }
+  .node .bmark .ico { width: 12px; height: 12px; }
+  @media (min-width: 900px) { body.boarded #main, body.boarded #traybar, body.boarded #dock, body.boarded #panel { margin-right: 460px; }
+    body.boarded #ver { right: 472px; } }
+  #pboard { font-size: 11.5px; color: var(--fg); opacity: .9; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #pboard:hover { text-decoration: underline; }
   #empty { text-align: center; padding: 60px 16px; }
   #empty .ico { width: 0; }
   #main.bg-stars { animation: none; }
@@ -312,7 +357,7 @@
 <div id="panel">
   <div class="pcard">
     <div id="pav"></div>
-    <div class="pmain"><div class="who" id="pwho"></div><div class="what" id="pwhat"></div><div id="pmeta"></div></div>
+    <div class="pmain"><div class="who" id="pwho"></div><div class="what" id="pwhat"></div><div id="pmeta"></div><div id="pboard" hidden></div></div>
     <div class="actions" id="pactions"></div>
   </div>
   <div class="msg"><input id="pmsg" type="text" placeholder="Message this agent…  (Enter)" aria-label="Message"><button id="psend">Send</button></div>
@@ -320,6 +365,7 @@
   <div class="cstrip" id="pconvo" hidden></div>
   <div class="note" id="pnote"></div>
 </div>
+<aside id="board" hidden aria-label="Work board"></aside>
 <div id="act" class="pop actpop" hidden></div>
 <div id="inbox" class="pop actpop" hidden></div>
 <div id="hdlg" class="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="hdlgt">
@@ -347,7 +393,7 @@
   in <i>Free</i> layout: drag to move it (positions are remembered)<br>
   <b>Keys</b> (with one selected)<br>
   <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>M</kbd> message · <kbd>R</kbd> rename ·
-  <kbd>D</kbd> description · <kbd>K</kbd> keep alive · <kbd>Del</kbd> trash · <kbd>B</kbd> roll the bottom bar up/down · <kbd>/</kbd> filter · <kbd>Esc</kbd> clear · <kbd>?</kbd> this help
+  <kbd>D</kbd> description · <kbd>K</kbd> keep alive · <kbd>T</kbd> work board · <kbd>Del</kbd> trash · <kbd>B</kbd> roll the bottom bar up/down · <kbd>/</kbd> filter · <kbd>Esc</kbd> clear · <kbd>?</kbd> this help
 </div>
 <script nonce="{{nonce}}">
 const vscode = acquireVsCodeApi();
@@ -358,6 +404,10 @@ if (typeof Critters === 'undefined') {   // critters.js not loaded: plain circle
 const $ = (id) => document.getElementById(id);
 // simple line icons, drawn for CrewMon (16x16 grid)
 const ICONS = {
+  board: '<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M6.3 3v10M9.7 3v10"/>',
+  pin: '<path d="M6 2.5h4l-.6 4 2.1 2H4.5l2.1-2z"/><path d="M8 8.5v5"/>',
+  move: '<path d="M3 5.5h10M3 10.5h10"/><path d="M10.5 3 13 5.5 10.5 8"/>',
+  sync: '<path d="M13 6.5A5 5 0 0 0 3.6 5"/><path d="M3 2.8V5.3h2.5"/><path d="M3 9.5A5 5 0 0 0 12.4 11"/><path d="M13 13.2v-2.5h-2.5"/>',
   up: '<path d="M3.5 10 8 5.5l4.5 4.5"/>',
   down: '<path d="M3.5 6 8 10.5 12.5 6"/>',
   open: '<path d="M9 3h4v4"/><path d="M13 3 7.5 8.5"/><path d="M11 9.5V13H3V5h3.5"/>',
@@ -386,6 +436,7 @@ const base = (p) => (p || '').split('/').filter(Boolean).pop() || '';
 const tilde = (p) => (p || '').replace(/^\/home\/[^/]+/, '~');
 const post = (m) => vscode.postMessage(m);
 
+let boards = {}, boardOpen = '', boardDoneOpen = false;
 let sessions = [], keeper = null, chips = [], replies = {}, messengerOn = false, messengerStatus = 'off', active = [], activity = [];
 const saved = vscode.getState() || {};
 let layout = saved.layout || 'grouped';
@@ -526,6 +577,7 @@ function nodeHTML(s) {
   const bubble = reply ? '<div class="bubble reply" title="' + esc(reply) + '">' + ic('reply') + esc(reply) + '</div>'
     : s.state === 'busy' && s.activity ? '<div class="bubble" title="' + esc(s.activity) + '">' + esc(s.activity) + '</div>' : '';
   return bubble + (s.needsYou ? '<div class="badge" title="Waiting for you: a question or an approval">!</div>' : '') +
+    (boards[s.id] ? '<div class="bmark" title="Tracked: it has a work board (T)">' + ic('board') + '</div>' : '') +
     Critters.critterSVG({ id: s.id, state: stateKey(s), size, style: critterStyle() }) +
     '<div class="t">' + esc(s.title) + '</div>' +
     (convoLine(s) ? '<div class="s convo">' + esc(convoLine(s)) + '</div>'
@@ -667,6 +719,7 @@ function renderPanel() {
     else btn('keep', inVS && watched(one) ? 'Watched' : 'Keep alive',
       inVS ? 'Let the keeper keep it running when VS Code closes it (K)' : 'Run it on the machine now, reachable from the Claude app (K)',
       () => keepAlive(one), inVS && watched(one));
+    btn('board', boards[one.id] ? 'Board' : 'Track', boards[one.id] ? 'Open its work board (T)' : 'Track it: keep a work board of what it does (T)', () => boardFor(one));
     btn('handover', 'Hand over…', 'Pass this work to another agent: it writes a note, the other continues', (e) => pickPartner(one, 'handover', e));
     btn('cloud', 'Via Drive…', 'Hand this work over through Google Drive, to another computer, a colleague or claude.ai', () => openHandover(one, null, true));
     btn('ask', 'Ask…', 'Ask another agent a question for this one (needs the messenger)', (e) => pickPartner(one, 'ask', e), !messengerOn);
@@ -675,6 +728,9 @@ function renderPanel() {
   } else {
     btn('x', 'Clear', 'Clear the selection (Esc)', clearSel);
   }
+  const pb = $('pboard'), bd = one && boards[one.id];
+  pb.hidden = !bd;
+  if (bd) { pb.textContent = boardLine(one, bd); pb.title = 'Open the work board (T)'; pb.onclick = () => openBoard(one.id); }
   const conv = one ? active.find(x => x.a === one.id || x.b === one.id) : null;
   $('pconvo').hidden = !conv;
   if (!trayUp && !conv) p.style.display = 'none';      // rolled down: only a conversation in progress stays visible
@@ -703,6 +759,122 @@ function keepAlive(s) {
 $('traybtn').onclick = () => setTray(!trayUp);
 $('psend').onclick = () => send($('pmsg').value);
 $('pmsg').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); send($('pmsg').value); } if (e.key === 'Escape') $('pmsg').blur(); e.stopPropagation(); });
+
+// ---------------- work board (docs/BOARD.md) ----------------
+const SECS = [['now', 'Now'], ['waiting', 'Waiting on you'], ['next', 'Next'], ['later', 'Later'], ['done', 'Done']];
+function boardLine(s, b) {
+  const n = (sec) => b.items.filter(x => x.section === sec).length;
+  const now = b.items.find(x => x.section === 'now');
+  const parts = [now ? 'Now: ' + now.text : s.state === 'busy' && s.activity ? 'Now: ' + s.activity : ''];
+  if (n('waiting') || s.needsYou) parts.push((n('waiting') + (s.needsYou ? 1 : 0)) + ' waiting on you');
+  parts.push(n('next') + ' next', n('done') + ' done');
+  return '▦ ' + parts.filter(Boolean).join(' · ');
+}
+function boardFor(s) {
+  if (!boards[s.id]) { post({ type: 'board', op: 'track', id: s.id, title: s.title }); boards[s.id] = { items: [], vision: '', syncedAt: 0, syncing: true }; }
+  openBoard(s.id);
+}
+function openBoard(id) { boardOpen = id; renderBoard(); render(); setTimeout(() => { const f = $('board').querySelector('.add input'); if (f && !boards[id].items.length) f.focus(); }, 0); }
+function closeBoard() { boardOpen = ''; renderBoard(); }
+function bpost(op, extra) { post(Object.assign({ type: 'board', id: boardOpen, op }, extra || {})); }
+function prefill(id, text) {
+  if (!(selected.size === 1 && selected.has(id))) select(id, false);
+  if (!trayUp) setTray(true);
+  $('pmsg').value = text; $('pmsg').focus();
+}
+function renderBoard() {
+  const el = $('board');
+  const b = boardOpen && boards[boardOpen], s = boardOpen && byId(boardOpen);
+  document.body.classList.toggle('boarded', !!(b && s));
+  if (!b || !s) { el.hidden = true; if (boardOpen && !b) boardOpen = ''; return; }
+  if (!el.hidden && el.contains(document.activeElement) && document.activeElement.matches('input[type=text], .edit')) return;   // do not redraw under your typing
+  el.hidden = false;
+  el.style.top = $('main').getBoundingClientRect().top + 'px';
+  const synced = b.syncing ? 'syncing…' : b.syncedAt ? 'synced ' + ago(Math.round((Date.now() - b.syncedAt) / 1000)) : 'not synced yet';
+  const item = (x) => {
+    const tags = [];
+    if (x.src === 'you') tags.push('<span class="btag you" title="Yours: never changed by the sync">you</span>');
+    else if (x.src === 'agent') tags.push('<span class="btag agent" title="From the agent\'s own to-do list">agent</span>');
+    if (x.pinned && x.src !== 'you') tags.push('<span class="btag you" title="Pinned">pinned</span>');
+    if (x.probable) tags.push('<span class="btag prob" title="Marked done without proof">probably</span>');
+    const ev = x.evidence ? ' title="' + esc(x.evidence) + '"' : '';
+    return '<div class="bitem' + (x.section === 'done' ? ' done' : '') + (x.probable ? ' probable' : '') + '" data-item="' + esc(x.id) + '">' +
+      '<input type="checkbox"' + (x.section === 'done' ? ' checked' : '') + ' aria-label="Done">' +
+      '<div class="tx"' + ev + '><span class="txt">' + esc(x.text) + '</span><span class="tags">' + tags.join('') + '</span></div>' +
+      '<span class="acts"><button data-a="ask" title="Ask the agent about this (fills the message bar)">' + ic('ask') + '</button>' +
+      '<button data-a="pin" title="' + (x.pinned ? 'Unpin' : 'Pin: the sync never moves it') + '">' + ic('pin') + '</button>' +
+      '<button data-a="move" title="Move to…">' + ic('move') + '</button>' +
+      '<button data-a="del" title="Delete (it will not come back)">' + ic('trash') + '</button></span></div>';
+  };
+  let html = '<h3>' + Critters.critterSVG({ id: s.id, state: stateKey(s), size: 26, style: critterStyle() }) + '<span class="t">' + esc(s.title) + '</span>' +
+    '<button class="ghost" id="bclose" title="Close (Esc)" aria-label="Close">' + ic('x') + '</button></h3>' +
+    '<div class="sub"><span>' + esc(s.needsYou ? 'needs you' : s.state) + '</span><span>' + esc(synced) + '</span>' +
+    (b.lastError ? '<span class="err" title="' + esc(b.lastError) + '">sync problem: ' + esc(b.lastError.slice(0, 60)) + '</span>' : '') + '</div>' +
+    '<div class="tools"><button class="ghost" id="bsync"' + (b.syncing ? ' disabled' : '') + '>' + ic('sync') + 'Sync now</button>' +
+    '<button class="ghost" id="bcopy">' + ic('copy') + 'Copy</button><button class="ghost" id="buntrack" title="Stop tracking; the board is kept">' + ic('x') + 'Untrack</button></div>' +
+    '<div class="vision" id="bvision" title="Click to edit">' + '<b>Vision</b>' + (b.vision ? esc(b.vision) : '<span class="ph">the longer-term goal, in one line (click to write)</span>') + '</div>';
+  for (const [sec, label] of SECS) {
+    let items = b.items.filter(x => x.section === sec).sort((p, q) => (q.pinned - p.pinned) || (sec === 'done' ? q.at - p.at : p.at - q.at));
+    const live = [];
+    if (sec === 'now' && s.state === 'busy' && s.activity) live.push('<div class="bitem live" title="Live, from what it is doing this second">▶ <div class="tx">' + esc(s.activity) + '</div></div>');
+    if (sec === 'waiting' && s.needsYou) live.push('<div class="bitem live ask">✋ <div class="tx">' + (s.pendingAsk ? 'It asked you a question' : 'It waits for your approval' + (s.pendingTool ? ' (' + esc(s.pendingTool) + ')' : '')) +
+      '</div><button class="ghost" data-open="1">' + ic('open') + 'Open chat</button></div>');
+    const count = items.length + live.length;
+    if (sec === 'done' && !boardDoneOpen) items = [];
+    html += '<div class="bsec ' + sec + '"><h4' + (sec === 'done' ? ' id="bdone" title="Show or hide"' : '') + '>' + label + ' <span class="n">' + count + '</span>' +
+      (sec === 'done' ? (boardDoneOpen ? ' ▾' : ' ▸') : '') + '</h4>' + live.join('') + items.map(item).join('') +
+      (!count && sec !== 'done' ? '<div class="bempty">' + (sec === 'now' ? 'nothing in progress' : sec === 'waiting' ? 'nothing waits on you' : 'empty') + '</div>' : '') + '</div>';
+  }
+  html += '<div class="add"><input type="text" id="badd" placeholder="Add an item…  (Enter)" aria-label="New item"><select id="baddsec" aria-label="Section">' +
+    SECS.filter(([k]) => k !== 'done').map(([k, l]) => '<option value="' + k + '"' + (k === 'next' ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></div>' +
+    '<div class="foot"><button class="ghost" id="bsendnext" title="Fill the message bar with your Next items; you press Send">' + ic('send') + 'Send Next to agent</button>' +
+    '<button class="ghost" id="bcheck" title="Fill the message bar with the board and ask the agent to correct it; you press Send">' + ic('ask') + 'Check with agent</button></div>';
+  el.innerHTML = html;
+  const id = s.id;
+  $('bclose').onclick = closeBoard;
+  $('bsync').onclick = () => { bpost('sync'); b.syncing = true; renderBoard(); };
+  $('bcopy').onclick = () => bpost('copy');
+  $('buntrack').onclick = () => bpost('untrack');
+  if ($('bdone')) $('bdone').onclick = () => { boardDoneOpen = !boardDoneOpen; renderBoard(); };
+  el.querySelectorAll('[data-open]').forEach(x => x.onclick = () => post({ type: 'open', id }));
+  $('bvision').onclick = () => editInline($('bvision'), b.vision, (t) => bpost('vision', { text: t }), 'The longer-term goal, in one line');
+  $('badd').addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter' && $('badd').value.trim()) { bpost('add', { text: $('badd').value.trim(), section: $('baddsec').value }); $('badd').value = ''; }
+    if (e.key === 'Escape') $('badd').blur();
+  });
+  $('bsendnext').onclick = () => {
+    const next = b.items.filter(x => x.section === 'next');
+    if (!next.length) { prefill(id, 'What comes next, in 3 lines?'); return; }
+    prefill(id, 'From my board, the next steps are: ' + next.map((x, i) => (i + 1) + ') ' + x.text).join('; ') + '. Continue with these, in this order.');
+  };
+  $('bcheck').onclick = () => {
+    const name = { now: 'now', waiting: 'waiting on me', next: 'next', later: 'later' };
+    const open = b.items.filter(x => x.section !== 'done').map(x => x.text + ' (' + name[x.section] + ')').join('; ');
+    prefill(id, 'This is how I see your work right now: ' + (b.vision ? 'goal: ' + b.vision + '. ' : '') + (open || 'nothing open') +
+      '. Correct anything that is wrong or missing, in at most 5 lines. Do not start new work.');
+  };
+  el.querySelectorAll('.bitem[data-item]').forEach(row => {
+    const itemId = row.dataset.item, x = b.items.find(y => y.id === itemId);
+    row.querySelector('input[type=checkbox]').onchange = (e) => bpost(e.target.checked ? 'tick' : 'untick', { itemId });
+    row.querySelector('.txt').ondblclick = () => editInline(row.querySelector('.tx'), x.text, (t) => bpost('text', { itemId, text: t }), 'Item');
+    row.querySelectorAll('[data-a]').forEach(btn => btn.onclick = (ev) => {
+      const a = btn.dataset.a;
+      if (a === 'ask') prefill(id, 'About "' + x.text + '": ');
+      else if (a === 'pin') bpost('pin', { itemId, on: !x.pinned });
+      else if (a === 'del') bpost('delete', { itemId });
+      else if (a === 'move') openMenu([['Move to…', 'head']].concat(SECS.filter(([k]) => k !== x.section).map(([k, l]) => [l, () => bpost('move', { itemId, to: k })])), ev);
+    });
+  });
+}
+function editInline(host, value, done, label) {
+  const inp = document.createElement('input'); inp.type = 'text'; inp.className = 'edit'; inp.value = value || ''; inp.setAttribute('aria-label', label);
+  host.innerHTML = ''; host.appendChild(inp); host.onclick = null; inp.focus(); inp.select();
+  let finished = false;
+  const finish = (save) => { if (finished) return; finished = true; const t = inp.value.trim(); inp.blur(); if (save && t !== (value || '')) done(t); setTimeout(renderBoard, 0); };
+  inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); });
+  inp.addEventListener('blur', () => finish(true));
+}
 
 // ---------------- dock ----------------
 function groupNames() { return [...new Set(sessions.map(s => s.group).filter(Boolean))].sort(); }
@@ -801,6 +973,7 @@ function showMenu(s, ev) {
     ['Message…', () => { select(s.id, false); setTimeout(() => $('pmsg').focus(), 0); }],
     ['Rename…', () => post({ type: 'rename', id: s.id, title: s.title, file: s.file })],
     ['Edit description…', () => post({ type: 'role', id: s.id, title: s.title, desc: role(s) })],
+    [boards[s.id] ? 'Work board' : 'Track (keep a work board)', () => boardFor(s)],
     ['Copy ids (session + agent)', () => post({ type: 'copy', text: idsText(s) })],
     ['Copy session id only', () => post({ type: 'copy', text: s.id })],
     ['-'],
@@ -838,7 +1011,9 @@ function openHandover(a, b, toDrive) {
   $('happrove').checked = true; $('happrove').parentElement.hidden = !messengerOn;
   $('hdlg').hidden = false; setDest(!!toDrive || !b); $('hfocus').focus();
 }
-$('hcancel').onclick = () => { $('hdlg').hidden = true; };
+// closing it gives the keys back to the map (the focus must not stay in the hidden window)
+function closeHandover() { $('hdlg').hidden = true; if ($('hdlg').contains(document.activeElement)) document.activeElement.blur(); }
+$('hcancel').onclick = closeHandover;
 $('hstart').onclick = () => {
   if (!hpair) return;
   const focus = $('hfocus').value.trim();
@@ -846,9 +1021,9 @@ $('hstart').onclick = () => {
   if (focus) { textA += ' Hand over only this part: ' + focus + '.'; textB += ' You are taking over: ' + focus + '.'; }
   if ($('hdDrive').checked) post({ type: 'handover', dest: 'drive', from: hpair.a.id, fromTitle: hpair.a.title, fromCwd: hpair.a.startCwd, textA });
   else post({ type: 'handover', from: hpair.a.id, to: hpair.b.id, fromTitle: hpair.a.title, toTitle: hpair.b.title, textA, textB, approve: $('happrove').checked });
-  $('hdlg').hidden = true;
+  closeHandover();
 };
-$('hdlg').addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('hdlg').hidden = true; } e.stopPropagation(); });
+$('hdlg').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeHandover(); e.stopPropagation(); });
 
 // ---------------- Activity: conversations in progress + every message and reply ----------------
 function convoActions(a) {
@@ -967,6 +1142,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '/') { e.preventDefault(); $('q').focus(); return; }
   if (e.key.toLowerCase() === 'b' && !e.ctrlKey && !e.metaKey && !e.altKey) { setTray(!trayUp); return; }
   if (e.key === '?') { $('help').style.display = $('help').style.display === 'block' ? 'none' : 'block'; return; }
+  if (e.key === 'Escape' && boardOpen) { closeBoard(); return; }
   if (e.key === 'Escape') { $('menu').style.display = 'none'; $('help').style.display = 'none'; toggleView(false); toggleAct(false); toggleInbox(false); clearSel(); return; }
   if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
     e.preventDefault();
@@ -997,6 +1173,7 @@ document.addEventListener('keydown', (e) => {
   else if (k === 'r') post({ type: 'rename', id: one.id, title: one.title, file: one.file });
   else if (k === 'd') post({ type: 'role', id: one.id, title: one.title, desc: role(one) });
   else if (k === 'k') keepAlive(one);
+  else if (k === 't') { if (boardOpen === one.id) closeBoard(); else boardFor(one); }
   else if (e.key === 'Delete') post({ type: 'keeper', action: 'delete', id: one.id, title: one.title });
 });
 $('helpbtn').onclick = () => { $('help').style.display = $('help').style.display === 'block' ? 'none' : 'block'; };
@@ -1030,10 +1207,11 @@ window.addEventListener('message', (e) => {
     replies = m.data.replies || {}; messengerOn = !!m.data.messenger; messengerStatus = m.data.messengerStatus || 'off'; active = m.data.active || [];
     activity = m.data.activity || []; if (!$('act').hidden) renderActivity();
     drive = m.data.drive || drive; if (!$('inbox').hidden) renderInbox();
+    boards = m.data.boards || {};
     renderVersions(m.data.versions || {});
     for (const id of [...selected]) if (!byId(id)) selected.delete(id);
     if (drag) return;   // do not redraw under the pointer while dragging
-    try { renderKeeper(); renderMessenger(); render(); drawArrows(); }
+    try { renderKeeper(); renderMessenger(); render(); drawArrows(); renderBoard(); }
     catch (err) { $('groups').innerHTML = '<p style="color:var(--vscode-errorForeground)">CrewMon could not draw the map: ' + esc(err.message) +
       '. If you just updated it, run "Developer: Reload Window".</p>'; }
   }
