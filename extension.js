@@ -11,6 +11,7 @@ const { execFile, execFileSync } = require('child_process');
 const { snapshot, runningSessions, ROLES, AUTO, GROUPS } = require('./snapshot');
 const { claudeBin, tmuxBin } = require('./processes');
 const Board = require('./board');
+const { pendingRequests, STARTS } = require('./delivery');
 
 // The keeper (keeps chats running on the machine when VS Code closes them): ~/.local/bin/keeper, else the bundled copy.
 function keeperPath(root) {
@@ -102,8 +103,29 @@ function stopMessenger() { execFile(tmuxBin(), ['kill-session', '-t', MSG_TMUX],
 function queue(job) {
   const rid = crypto.randomBytes(3).toString('hex');
   fs.mkdirSync(MSG_DIR, { recursive: true });
-  fs.appendFileSync(path.join(MSG_DIR, 'outbox.jsonl'), JSON.stringify(Object.assign({ rid }, job)) + '\n');
+  fs.appendFileSync(path.join(MSG_DIR, 'outbox.jsonl'), JSON.stringify(Object.assign({ rid, at: Date.now() }, job)) + '\n');
   return rid;
+}
+// Requests the messenger has not picked up: shown under Activity, and told once each
+const startedAt = Date.now(), toldLate = new Set();
+function readOutbox() {
+  try { return fs.readFileSync(path.join(MSG_DIR, 'outbox.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch (_) { return []; }
+}
+// The same rid again: the messenger ignores it if it did get the first one
+function requeue(rid) {
+  const o = readOutbox().reverse().find(x => x.rid === rid && STARTS.includes(x.kind));
+  if (o) queue(Object.assign({}, o, { at: Date.now() }));
+  toldLate.delete(rid);
+}
+const KIND = { handover: 'hand-over', ask: 'question', talk: 'discussion', message: 'message' };
+function tellLate(pending, title) {
+  for (const o of pending) {
+    if (o.at < startedAt || toldLate.has(o.rid)) continue;
+    toldLate.add(o.rid);
+    const to = o.fromTitle || o.aTitle || title(o.to);
+    vscode.window.showWarningMessage(`CrewMon: the messenger has not picked up your ${KIND[o.kind]} for "${to}".`, 'Send again', 'Discard')
+      .then(p => { if (p === 'Send again') requeue(o.rid); else if (p === 'Discard') queue({ kind: 'cancel', rid: o.rid }); if (p) setTimeout(push, 1500); });
+  }
 }
 let inboxSeen = Date.now();
 let noteSeen = Date.now();
@@ -141,6 +163,10 @@ function readInbox() {
   for (const x of lines) {
     if (x.kind === 'reply' && x.session && now - x.at < 30 * 60e3) { replies[x.session] = (x.text || '').slice(0, 300); replyAt[x.session] = x.at; }
     if (x.at > inboxSeen && x.kind === 'reply' && x.session && Board.load(x.session)) boardForce.add(x.session);   // a tracked agent answered: bring its board up to date
+    if (x.at > inboxSeen && x.kind === 'sent') {
+      const s = lastSessions.find(y => y.id === x.session);
+      vscode.window.setStatusBarMessage(`CrewMon: delivered to "${s ? s.title : (x.session || 'an agent').slice(0, 8)}"`, 5000);
+    }
     if (x.at > inboxSeen && x.kind === 'drive-uploaded') {
       let d = {}; try { d = JSON.parse(x.text); } catch (_) { /* */ }
       const pick = pickupText(d.title, d.url, d.zip);
@@ -175,8 +201,7 @@ function readInbox() {
   let active = [];
   try { active = JSON.parse(fs.readFileSync(path.join(MSG_DIR, 'active.json'), 'utf8')); } catch (_) { /* none */ }
   // the Activity log: what CrewMon asked for (outbox) and what happened (inbox), newest first
-  let out = [];
-  try { out = fs.readFileSync(path.join(MSG_DIR, 'outbox.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch (_) { /* none */ }
+  const out = readOutbox();
   const title = (id) => { const s = lastSessions.find(y => y.id === id); return s ? s.title : (id ? id.slice(0, 8) : ''); };
   const activity = lines.filter(x => ['sent', 'resent', 'reply', 'error', 'done', 'cancelled', 'note-ready', 'drive-uploaded', 'drive-marked'].includes(x.kind)).map(x => {
     const req = out.find(o => o.rid === x.rid) || {};
@@ -194,10 +219,13 @@ function readInbox() {
         else if (p.startsWith('Upload')) driveApprove(x.rid, x.text, title(x.session));
         else if (p.startsWith('Send')) queue({ kind: 'approve', rid: x.rid }); else queue({ kind: 'cancel', rid: x.rid }); setTimeout(push, 1500); });
   }
+  const late = pendingRequests(out, lines, active, now);
+  tellLate(late, title);
+  const pending = late.map(o => ({ rid: o.rid, kind: o.kind, at: o.at, aTitle: o.fromTitle || o.aTitle || '', bTitle: o.toTitle || o.bTitle || title(o.to) }));
   autoResend(active, lines);
   let drive = null;
   try { drive = JSON.parse(fs.readFileSync(path.join(MSG_DIR, 'drive.json'), 'utf8')); } catch (_) { /* not listed yet */ }
-  return { replies, replyAt, active, activity, drive };
+  return { replies, replyAt, active, activity, drive, pending };
 }
 
 // ---- Google Drive hand-overs ----
@@ -313,7 +341,7 @@ async function sendMessage(m) {
   const ids = m.ids || [];
   if ((await messengerStatus()) === 'on') {
     for (const id of ids) queue({ kind: 'message', to: id, text: m.text });
-    vscode.window.setStatusBarMessage(`CrewMon: sent to ${ids.length} agent${ids.length > 1 ? 's' : ''}`, 3000);
+    vscode.window.setStatusBarMessage(`CrewMon: sending to ${ids.length} agent${ids.length > 1 ? 's' : ''}`, 3000);
     return;
   }
   for (let i = 0; i < ids.length; i++) {
@@ -349,6 +377,7 @@ async function handover(m) {
   fs.mkdirSync(HANDOVERS, { recursive: true });
   const file = path.join(HANDOVERS, `${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '')}-${m.from.slice(0, 8)}-to-${m.to.slice(0, 8)}.md`);
   const fillT = (t) => (t || '').replace(/\{NOTE\}/g, file).replace(/\{A\}/g, m.fromTitle).replace(/\{B\}/g, m.toTitle);
+  const withNote = (t, how) => t.includes(file) ? t : t + '\n\n' + how + file + '.';   // {NOTE} may have been edited out
   if (m.dest === 'drive') {
     if ((await messengerStatus()) !== 'on') { vscode.window.showErrorMessage('CrewMon: a Google Drive hand-over needs the messenger (start it in the top bar).'); return; }
     if (driveBlocked(m.fromCwd)) { vscode.window.showErrorMessage('CrewMon: Google Drive hand-overs are turned off for this folder (setting crewmon.driveBlockedFolders).'); return; }
@@ -360,10 +389,10 @@ async function handover(m) {
   if ((await messengerStatus()) === 'on') {
     queue({ kind: 'handover', from: m.from, to: m.to, fromTitle: m.fromTitle, toTitle: m.toTitle, file,
       textA: m.textA || '', textB: m.textB || '', approve: !!m.approve });
-    vscode.window.showInformationMessage(`CrewMon: hand-over started: "${m.fromTitle}" writes the note, then "${m.toTitle}" continues.`);
+    vscode.window.showInformationMessage(`CrewMon: hand-over requested: "${m.fromTitle}" writes the note, then "${m.toTitle}" continues. Follow it under Activity.`);
     return;
   }
-  const ask = m.textA ? fillT(m.textA) : `Please write a hand-over note for another agent ("${m.toTitle}") who will continue part of your work. ` +
+  const ask = m.textA ? withNote(fillT(m.textA), 'Save the note as Markdown to ') : `Please write a hand-over note for another agent ("${m.toTitle}") who will continue part of your work. ` +
     `Save it as Markdown to ${file}. Include: the goal; what is done; key decisions and why; where things are (files, commands, ` +
     `data); open problems; and the exact next steps. Reply "hand-over ready" when it is saved.`;
   await openChat(m.from, ask);
@@ -375,7 +404,7 @@ async function handover(m) {
       const pick = await vscode.window.showInformationMessage(`CrewMon: the hand-over note from "${m.fromTitle}" is ready.`, `Open "${m.toTitle.slice(0, 30)}" with it`, 'Show the note');
       if (pick === 'Show the note') { vscode.window.showTextDocument(vscode.Uri.file(file)); }
       else if (pick) {
-        await openChat(m.to, m.textB ? fillT(m.textB) : `Read the hand-over note at ${file} from the agent "${m.fromTitle}" and continue from it. ` +
+        await openChat(m.to, m.textB ? withNote(fillT(m.textB), 'The hand-over note is at ') : `Read the hand-over note at ${file} from the agent "${m.fromTitle}" and continue from it. ` +
           `First confirm in 2-3 lines what you are taking over and what you will do next.`);
       }
     } else if (Date.now() - started > 3 * 3600e3) clearInterval(timer);
@@ -608,6 +637,7 @@ async function push() {
   data.activity = ib.activity;
   data.drive = ib.drive;
   data.boards = boardsForView(data.sessions);
+  data.pending = ib.pending;
   const slim = Object.assign({}, data, { sessions: (data.sessions || []).map(s => Object.assign({}, s, { summary: undefined })) });
   if (panel) panel.webview.postMessage({ type: 'data', data: slim });
 }
@@ -691,6 +721,7 @@ function open(context) {
       vscode.window.showInformationMessage('CrewMon: discussion started; replies appear over the critters and A sends a summary at the end.');
     }
     else if (m.type === 'convo' && m.action === 'approve' && m.drive) { await driveApprove(m.rid, m.file, m.fromTitle); setTimeout(push, 1500); }
+    else if (m.type === 'convo' && m.action === 'again') { requeue(m.rid); setTimeout(push, 3000); }
     else if (m.type === 'convo') { queue({ kind: m.action, rid: m.rid }); setTimeout(push, 1500); }
     else if (m.type === 'driveList') { if ((await messengerStatus()) === 'on') queue({ kind: 'drive-list' }); else vscode.window.showWarningMessage('CrewMon: the Drive inbox needs the messenger (start it in the top bar).'); }
     else if (m.type === 'drivePickup') { const rid = queue({ kind: 'drive-read', id: m.id || undefined, zipId: m.zipId || undefined, title: m.title }); pickups[rid] = { to: m.to, toTitle: m.toTitle, title: m.title, id: m.id };
