@@ -16,5 +16,10 @@ const { chromium } = require('playwright');
   await page.keyboard.press('t'); await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(__dirname, '..', '..', 'docs', 'screenshot-board.png') });
   console.log('docs/screenshot-board.png');
+  await page.evaluate(() => { select('e1f2a3b4-11', false); });                // Research Companion, open on one experiment
+  await page.keyboard.press('e'); await page.waitForTimeout(200);
+  await page.click('#rsAllBtn'); await page.click('.rexp[data-e="e1"] .rrow'); await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(__dirname, '..', '..', 'docs', 'screenshot-research.png') });
+  console.log('docs/screenshot-research.png');
   await browser.close();
 })();

@@ -11,7 +11,7 @@ bad()  { printf '  \033[31m✘\033[0m %s\n' "$1"; fail=1; }
 step() { printf '\n%s\n' "$1"; }
 
 step "1. Code parses"
-for f in extension.js snapshot.js board.js processes.js delivery.js media/critters.js tools/gallery.js tools/screenshot/build-demo.js tools/screenshot/shoot.js; do
+for f in extension.js snapshot.js board.js research.js processes.js delivery.js media/critters.js tools/gallery.js tools/screenshot/build-demo.js tools/screenshot/shoot.js; do
   node --check "$f" 2>/dev/null && ok "$f" || bad "$f does not parse"
 done
 python3 - <<'EOF' > /tmp/crewmon-check-map.js || bad "could not extract the map script"
@@ -25,7 +25,7 @@ for f in build_vsix.py make_icon.py; do python3 -m py_compile "$f" 2>/dev/null &
 rm -rf __pycache__ keeper/__pycache__
 python3 -c "import json; json.load(open('package.json')); json.load(open('messenger/.claude-plugin/plugin.json'))" && ok "package.json, plugin.json" || bad "a JSON file is invalid"
 
-node --test tools/test/*.test.js >/tmp/crewmon-check-tests.log 2>&1 && ok "board rules: $(grep -E '^(# |ℹ )pass' /tmp/crewmon-check-tests.log | sed -E 's/^(# |ℹ )pass //') tests pass" || { bad "board tests fail"; grep -E "not ok|Error" /tmp/crewmon-check-tests.log | head -5; }
+node --test tools/test/*.test.js >/tmp/crewmon-check-tests.log 2>&1 && ok "board and Research Companion rules: $(grep -E '^(# |ℹ )pass' /tmp/crewmon-check-tests.log | sed -E 's/^(# |ℹ )pass //') tests pass" || { bad "board or Research Companion tests fail"; grep -E "not ok|Error" /tmp/crewmon-check-tests.log | head -5; }
 
 step "2. Messenger plugin validates"
 CLAUDE_BIN=$(node -p "require('./processes').claudeBin() || ''")
@@ -53,7 +53,7 @@ git diff --quiet -- messenger/hooks/register.ts messenger/.claude-plugin/plugin.
 step "4. It runs (headless browser, example crew)"
 if [ -d tools/screenshot/node_modules/playwright ]; then
   node tools/screenshot/build-demo.js >/dev/null
-  node - <<'EOF' && ok "map, Activity, Inbox, View, hand-over window, work board, roll-down: no page errors" || bad "the map page reports errors"
+  node - <<'EOF' && ok "map, Activity, Inbox, View, hand-over window, work board, Research Companion, roll-down: no page errors" || bad "the map page reports errors"
 const { chromium } = require(process.cwd() + '/tools/screenshot/node_modules/playwright');
 (async () => {
   const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1400, height: 1000 } });
@@ -66,6 +66,11 @@ const { chromium } = require(process.cwd() + '/tools/screenshot/node_modules/pla
   await p.evaluate(() => { select(sessions[0].id, false); });
   await p.keyboard.press('t'); await p.waitForTimeout(150);
   if (await p.$eval('#board', e => e.hidden)) errs.push('the work board did not open');
+  await p.evaluate(() => { const s = sessions.find(x => x.rkey && research[x.rkey]); if (s) select(s.id, false); });
+  await p.keyboard.press('e'); await p.waitForTimeout(150);
+  if (await p.$eval('#research', e => e.hidden)) errs.push('Research Companion did not open');
+  for (const t of ['plan', 'compare', 'runs', 'questions']) { await p.click('[data-tab="' + t + '"]'); await p.waitForTimeout(60); }
+  await p.click('.rexp .rrow'); await p.waitForTimeout(60); await p.keyboard.press('Escape');
   await p.keyboard.press('b'); await p.keyboard.press('b'); await p.keyboard.press('Escape');
   await p.waitForTimeout(200);
   if (errs.length) { console.error(errs.join('\n')); process.exit(1); }

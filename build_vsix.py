@@ -9,7 +9,7 @@ import zipfile
 from xml.sax.saxutils import escape
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-FILES = ["package.json", "extension.js", "snapshot.js", "processes.js", "board.js", "delivery.js", "media/map.html", "media/critters.js", "media/icon.png", "media/icon.svg", "keeper/keeper", "messenger/.claude-plugin/plugin.json", "messenger/hooks/hooks.json", "messenger/hooks/register.ts", "README.md", "LICENSE", "docs/critters.png", "docs/styles.png", "docs/screenshot.png", "docs/screenshot-meadow.png", "docs/screenshot-board.png"]
+FILES = ["package.json", "extension.js", "snapshot.js", "processes.js", "board.js", "research.js", "delivery.js", "media/map.html", "media/critters.js", "media/icon.png", "media/icon.svg", "keeper/keeper", "messenger/.claude-plugin/plugin.json", "messenger/hooks/hooks.json", "messenger/hooks/register.ts", "README.md", "LICENSE", "docs/critters.png", "docs/styles.png", "docs/screenshot.png", "docs/screenshot-meadow.png", "docs/screenshot-board.png", "docs/screenshot-research.png"]
 
 pkg = json.load(open(os.path.join(ROOT, "package.json")))
 ver, name, pub = pkg["version"], pkg["name"], pkg["publisher"]

@@ -341,6 +341,93 @@
   #board .add select { background: var(--vscode-dropdown-background, var(--input)); color: var(--vscode-dropdown-foreground, var(--inputfg)); border: 1px solid var(--border); font: inherit; }
   #board .foot { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
   #board .edit { width: 100%; box-sizing: border-box; }
+  /* Research Companion drawer (docs/RESEARCH.md): same frame as the work board */
+  #research { position: fixed; right: 0; bottom: 0; z-index: 30; width: min(460px, 94vw); background: var(--card); border-left: 1px solid var(--border);
+    box-shadow: -10px 0 28px rgba(0,0,0,.28); overflow: auto; padding: 12px 16px 16px; box-sizing: border-box; font-size: 12.5px; }
+  #research h3 { margin: 0; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+  #research h3 .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #research .sub { color: var(--muted); font-size: 11.5px; margin: 3px 0 8px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  #research .sub .err { color: var(--alert); }
+  #research .tools { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  #research .tools button { padding: 3px 8px; }
+  #research .vision { border: 1px dashed var(--border); border-radius: 8px; padding: 6px 9px; margin-bottom: 10px; cursor: text; }
+  #research .vision b { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-right: 6px; }
+  #research .vision .ph { color: var(--muted); font-style: italic; }
+  #research .bsec { margin: 10px 0 4px; }
+  #research .bsec h4 { margin: 0 0 4px; font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); display: flex; gap: 6px; align-items: center; cursor: default; }
+  #research .bsec h4 .n { background: var(--soft, rgba(127,127,127,.15)); border-radius: 999px; padding: 0 6px; letter-spacing: 0; }
+  #research .bsec.waiting h4 { color: var(--alert); } #board .bsec.now h4 { color: var(--busy); }
+  #research .bsec.done h4 { cursor: pointer; }
+  #research .reply { margin-top: 10px; border-left: 3px solid var(--idle); background: var(--soft, rgba(127,127,127,.12)); border-radius: 6px; padding: 7px 10px; }
+  #research .reply.wait { border-left-color: var(--busy); color: var(--muted); }
+  #research .reply b { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 3px; }
+  #research .add { display: flex; gap: 6px; margin-top: 12px; }
+  #research .add input { flex: 1; min-width: 0; }
+  #research .add select { background: var(--vscode-dropdown-background, var(--input)); color: var(--vscode-dropdown-foreground, var(--inputfg)); border: 1px solid var(--border); font: inherit; }
+  #research .foot { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+  #research .edit { width: 100%; box-sizing: border-box; }
+  #research h3 .ico { width: 16px; height: 16px; }
+  .rscope, .rtabs, .rmetrics { display: flex; gap: 4px; flex-wrap: wrap; margin: 0 0 8px; }
+  .rscope button, .rtabs button, .rmetrics button { padding: 2px 9px; display: inline-flex; gap: 5px; align-items: center; }
+  .rscope button.on, .rtabs button.on, .rmetrics button.on { background: var(--vscode-button-background, var(--accent)); color: var(--vscode-button-foreground, #fff); border-color: transparent; }
+  .rtabs { border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  .rsum { color: var(--muted); font-size: 11.5px; margin-bottom: 8px; } .rsum .busy { color: var(--busy); font-weight: 600; } .rsum .bad { color: var(--alert); font-weight: 600; }
+  .rempty { color: var(--muted); padding: 8px 6px; line-height: 1.45; }
+  .rq { border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px; margin: 0 0 10px; }
+  .rq.answered { border-left: 3px solid var(--idle); } .rq.dropped { opacity: .65; } .rq.loose { border-style: dashed; }
+  .rqh { display: flex; gap: 7px; align-items: flex-start; margin-bottom: 4px; }
+  .rqh .qt { flex: 1; min-width: 0; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+  .rqs { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; color: var(--muted); cursor: pointer; flex: none; margin-top: 1px; }
+  .rq.open .rqs { color: var(--busy); border-color: var(--busy); } .rq.answered .rqs { color: var(--idle); border-color: var(--idle); }
+  .rqh .acts { display: none; gap: 2px; flex: none; } .rq:hover > .rqh .acts, .rqh:focus-within .acts { display: inline-flex; }
+  .rqh .acts button { padding: 1px 4px; background: transparent; color: var(--muted); border: 0; } .rqh .acts .ico { width: 13px; height: 13px; }
+  .rf { display: flex; gap: 8px; align-items: baseline; padding: 2px 4px; font-size: 12px; line-height: 1.4; }
+  .rf > b { flex: none; width: 66px; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .rf .rval { flex: 1; min-width: 0; cursor: text; overflow-wrap: anywhere; border-radius: 4px; } .rf .rval:hover { background: var(--vscode-list-hoverBackground); }
+  .ph { color: var(--muted); }
+  .rexp { border-radius: 6px; margin: 2px 0; } .rexp.open { background: var(--soft, rgba(127,127,127,.08)); padding-bottom: 6px; }
+  .rrow { display: flex; gap: 8px; align-items: flex-start; padding: 5px 6px; border-radius: 6px; cursor: pointer; }
+  .rrow:hover, .rrow:focus-visible { background: var(--vscode-list-hoverBackground); outline: none; }
+  .rexp .ri { width: 16px; text-align: center; flex: none; font-weight: 700; color: var(--muted); }
+  .rexp.running .ri { color: var(--busy); } .rexp.done .ri { color: var(--idle); } .rexp.failed .ri { color: var(--alert); }
+  .rexp.dropped .rt { text-decoration: line-through; color: var(--muted); }
+  .rtx { flex: 1; min-width: 0; line-height: 1.35; overflow-wrap: anywhere; } .rt { font-weight: 500; }
+  .rm { color: var(--muted); font-size: 11px; }
+  .rexp:not(.open) .rm { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .rv { font-size: 10px; border-radius: 999px; padding: 0 6px; margin-left: 6px; border: 1px solid var(--border); white-space: nowrap; }
+  .rv.supports { color: var(--idle); border-color: var(--idle); } .rv.refutes { color: var(--alert); border-color: var(--alert); } .rv.unclear { color: var(--muted); } .rv.prob { border-style: dashed; }
+  .rdet { padding: 0 6px 0 28px; }
+  .rchip { display: inline-block; font-size: 11px; border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; margin: 1px 4px 1px 0; }
+  .rchip.num { font-variant-numeric: tabular-nums; }
+  .racts { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; } .racts button { padding: 2px 7px; }
+  .rwho { padding: 1px 6px; display: inline-flex; gap: 4px; align-items: center; margin: 0 4px 2px 0; } .rwho svg { width: 16px; height: 16px; }
+  .rscope svg { width: 16px; height: 16px; }
+  .rrun { display: flex; gap: 8px; align-items: flex-start; padding: 5px 6px; border-radius: 6px; border-bottom: 1px solid var(--border); }
+  .rrun:last-child { border-bottom: 0; }
+  .rrun .ji { width: 16px; text-align: center; flex: none; font-weight: 700; color: var(--muted); }
+  .rrun.running .ji { color: var(--busy); animation: spin 1.6s linear infinite; display: inline-block; } .rrun.completed .ji { color: var(--idle); } .rrun.failed .ji { color: var(--alert); }
+  .rrun.smoke { opacity: .7; } .rrun .jt { flex: 1; min-width: 0; line-height: 1.35; overflow-wrap: anywhere; } .rrun .jm { color: var(--muted); font-size: 11px; } .rrun .jm.last { font-family: var(--vscode-editor-font-family, monospace); font-size: 10.5px; }
+  .rruns { flex: 1; min-width: 0; } .rruns .rrun { padding: 3px 0; }
+  .rlink { padding: 0 6px; margin-top: 3px; display: inline-flex; gap: 4px; align-items: center; font-size: 11px; } .rlink .ico { width: 12px; height: 12px; }
+  .rsmoke { display: block; color: var(--muted); font-size: 11.5px; margin: 0 0 6px; }
+  .rcmp-q select { width: 100%; margin-bottom: 8px; background: var(--vscode-dropdown-background, var(--input)); color: var(--vscode-dropdown-foreground, var(--inputfg)); border: 1px solid var(--border); font: inherit; padding: 3px; }
+  .rbars { margin: 8px 0 12px; } .rbar { display: grid; grid-template-columns: minmax(0, 42%) 1fr auto; gap: 8px; align-items: center; padding: 3px 4px; border-radius: 5px; cursor: pointer; }
+  .rbar:hover { background: var(--vscode-list-hoverBackground); }
+  .rbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .rbt { height: 10px; background: var(--soft, rgba(127,127,127,.15)); border-radius: 3px; overflow: hidden; }
+  .rbf { display: block; height: 100%; background: var(--machine, #5B8DEF); } .rbar.top .rbf { background: var(--idle); } .rbv { font-variant-numeric: tabular-nums; font-size: 11.5px; }
+  .rtable-wrap { overflow-x: auto; } .rtable { border-collapse: collapse; width: 100%; font-size: 11.5px; }
+  .rtable th, .rtable td { border-bottom: 1px solid var(--border); padding: 4px 6px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rtable th:first-child, .rtable td:first-child { text-align: left; max-width: 170px; overflow: hidden; text-overflow: ellipsis; } .rtable th { color: var(--muted); font-weight: 600; }
+  .rtable td.best { font-weight: 700; color: var(--idle); }
+  .rmemadd select { background: var(--vscode-dropdown-background, var(--input)); color: var(--vscode-dropdown-foreground, var(--inputfg)); border: 1px solid var(--border); font: inherit; }
+  .rmem .mt { cursor: pointer; } .rmem .mt:hover { text-decoration: underline; }
+  .rmbody { white-space: pre-wrap; color: var(--fg); opacity: .85; font-size: 11.5px; margin-top: 4px; border-left: 2px solid var(--border); padding-left: 8px; }
+  .rsendrules { margin-left: auto; padding: 0 7px; font-size: 11px; letter-spacing: 0; text-transform: none; display: inline-flex; gap: 4px; align-items: center; } .rsendrules .ico { width: 12px; height: 12px; }
+  #research .note { color: var(--muted); font-size: 11.5px; margin: 2px 0 8px; line-height: 1.4; }
+  #presearch { font-size: 11.5px; color: var(--fg); opacity: .9; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #presearch:hover { text-decoration: underline; }
+  .node .rmark { color: var(--busy); }
+  @media (prefers-reduced-motion: reduce) { .rrun.running .ji { animation: none; } }
   .node .bmark { position: absolute; top: 24px; left: 26px; width: 18px; height: 18px; border-radius: 5px; background: var(--card); border: 1px solid var(--border);
     display: flex; align-items: center; justify-content: center; color: var(--fg); }
   .node .bmark .ico { width: 12px; height: 12px; }
@@ -401,7 +488,7 @@
 <div id="panel">
   <div class="pcard">
     <div id="pav"></div>
-    <div class="pmain"><div class="who" id="pwho"></div><div class="what" id="pwhat"></div><div id="pmeta"></div><div id="pboard" hidden></div></div>
+    <div class="pmain"><div class="who" id="pwho"></div><div class="what" id="pwhat"></div><div id="pmeta"></div><div id="pboard" hidden></div><div id="presearch" hidden></div></div>
     <div class="actions" id="pactions"></div>
   </div>
   <div class="msg"><input id="pmsg" type="text" placeholder="Message this agent…  (Enter)" aria-label="Message"><button id="psend">Send</button></div>
@@ -410,6 +497,7 @@
   <div class="note" id="pnote"></div>
 </div>
 <aside id="board" hidden aria-label="Work board"></aside>
+<aside id="research" hidden aria-label="Research Companion"></aside>
 <div id="act" class="pop actpop" hidden></div>
 <div id="inbox" class="pop actpop" hidden></div>
 <div id="hdlg" class="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="hdlgt">
@@ -437,7 +525,7 @@
   in <i>Free</i> layout: drag to move it (positions are remembered)<br>
   <b>Keys</b> (with one selected)<br>
   <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>M</kbd> message · <kbd>R</kbd> rename ·
-  <kbd>D</kbd> description · <kbd>K</kbd> keep alive · <kbd>T</kbd> work board · <kbd>Del</kbd> trash · <kbd>B</kbd> roll the bottom bar up/down · <kbd>/</kbd> filter · <kbd>Esc</kbd> clear · <kbd>?</kbd> this help
+  <kbd>D</kbd> description · <kbd>K</kbd> keep alive · <kbd>T</kbd> work board · <kbd>E</kbd> Research Companion · <kbd>Del</kbd> trash · <kbd>B</kbd> roll the bottom bar up/down · <kbd>/</kbd> filter · <kbd>Esc</kbd> clear · <kbd>?</kbd> this help
 </div>
 <script nonce="{{nonce}}">
 const vscode = acquireVsCodeApi();
@@ -449,6 +537,8 @@ const $ = (id) => document.getElementById(id);
 // simple line icons, drawn for CrewMon (16x16 grid)
 const ICONS = {
   board: '<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M6.3 3v10M9.7 3v10"/>',
+  flask: '<path d="M6 2.5h4"/><path d="M6.8 2.5v4L3.1 12.4a1 1 0 0 0 .9 1.6h8a1 1 0 0 0 .9-1.6L9.2 6.5v-4"/><path d="M4.7 10h6.6"/>',
+  chart: '<path d="M2.5 13.5h11"/><path d="M4.5 11V8M8 11V4.5M11.5 11V6.5"/>',
   pin: '<path d="M6 2.5h4l-.6 4 2.1 2H4.5l2.1-2z"/><path d="M8 8.5v5"/>',
   move: '<path d="M3 5.5h10M3 10.5h10"/><path d="M10.5 3 13 5.5 10.5 8"/>',
   sync: '<path d="M13 6.5A5 5 0 0 0 3.6 5"/><path d="M3 2.8V5.3h2.5"/><path d="M3 9.5A5 5 0 0 0 12.4 11"/><path d="M13 13.2v-2.5h-2.5"/>',
@@ -481,6 +571,9 @@ const tilde = (p) => (p || '').replace(/^\/home\/[^/]+/, '~');
 const post = (m) => vscode.postMessage(m);
 
 let boards = {}, boardOpen = '', boardDoneOpen = false, boardJobsOpen = false;
+let rsMemKind = 'behavior';
+let research = {}, rsOpen = '', rsAgent = '', rsFrom = '', rsTab = 'questions', rsMetric = '', rsQ = '', rsShowSmoke = false, rsArtsOpen = false;
+const rsMemOpen = new Set(), rsOpenE = new Set(), rsShut = new Set(['done', 'failed', 'stopped', 'dropped']), rsPending = {};
 let replyAt = {};
 const boardSent = {};    // id -> {at, what}: you sent something from the board; the reply shows under it
 let sessions = [], keeper = null, chips = [], replies = {}, messengerOn = false, messengerStatus = 'off', active = [], activity = [], pending = [];
@@ -625,6 +718,7 @@ function nodeHTML(s) {
     : s.state === 'busy' && s.activity ? '<div class="bubble" title="' + esc(s.activity) + '">' + esc(s.activity) + '</div>' : '';
   return bubble + (s.needsYou ? '<div class="badge" title="Waiting for you: a question or an approval">!</div>' : '') +
     (boards[s.id] ? '<div class="bmark" title="Tracked: it has a work board (T)">' + ic('board') + '</div>' : '') +
+    (s.rkey && research[s.rkey] && research[s.rkey].runs.some(x => x.agent === s.id && x.status === 'running' && !x.smoke) ? '<div class="bmark rmark"' + (boards[s.id] ? ' style="left:46px"' : '') + ' title="An experiment run of this agent is running (E: Research Companion)">' + ic('flask') + '</div>' : '') +
     Critters.critterSVG({ id: s.id, state: stateKey(s), size, style: critterStyle() }) +
     '<div class="t">' + esc(s.title) + '</div>' +
     (convoLine(s) ? '<div class="s convo">' + esc(convoLine(s)) + '</div>'
@@ -801,6 +895,7 @@ function renderPanel() {
       inVS ? 'Let the keeper keep it running when VS Code closes it (K)' : 'Run it on the machine now, reachable from the Claude app (K)',
       () => keepAlive(one), inVS && watched(one));
     btn('board', boards[one.id] ? 'Board' : 'Track', boards[one.id] ? 'Open its work board (T)' : 'Track it: keep a work board of what it does (T)', () => boardFor(one));
+    btn('flask', 'Research', 'Research Companion: the questions, experiments, runs and results of this project, and why (E)', () => researchFor(one), !one.rkey);
     btn('handover', 'Hand over…', 'Pass this work to another agent: it writes a note, the other continues', (e) => pickPartner(one, 'handover', e));
     btn('cloud', 'Via Drive…', 'Hand this work over through Google Drive, to another computer, a colleague or claude.ai', () => openHandover(one, null, true));
     btn('ask', 'Ask…', 'Ask another agent a question for this one (needs the messenger)', (e) => pickPartner(one, 'ask', e), !messengerOn);
@@ -812,6 +907,9 @@ function renderPanel() {
   const pb = $('pboard'), bd = one && boards[one.id];
   pb.hidden = !bd;
   if (bd) { pb.textContent = boardLine(one, bd); pb.title = 'Open the work board (T)'; pb.onclick = () => openBoard(one.id); }
+  const pr = $('presearch'), rl = one ? researchLine(one) : '';
+  pr.hidden = !rl;
+  if (rl) { pr.textContent = rl; pr.title = 'Open Research Companion (E)'; pr.onclick = () => researchFor(one); }
   const conv = one ? active.find(x => x.a === one.id || x.b === one.id) : null;
   $('pconvo').hidden = !conv;
   if (!trayUp && !conv) p.style.display = 'none';      // rolled down: only a conversation in progress stays visible
@@ -857,7 +955,7 @@ function boardFor(s) {
   if (!boards[s.id]) { post({ type: 'board', op: 'track', id: s.id, title: s.title }); boards[s.id] = { items: [], vision: '', syncedAt: 0, syncing: true }; }
   openBoard(s.id);
 }
-function openBoard(id) { boardOpen = id; renderBoard(); render(); setTimeout(() => { const f = $('board').querySelector('.add input'); if (f && !boards[id].items.length) f.focus(); }, 0); }
+function openBoard(id) { if (rsOpen) { rsOpen = ''; renderResearch(); } boardOpen = id; renderBoard(); render(); setTimeout(() => { const f = $('board').querySelector('.add input'); if (f && !boards[id].items.length) f.focus(); }, 0); }
 function closeBoard() { boardOpen = ''; renderBoard(); }
 function bpost(op, extra) { post(Object.assign({ type: 'board', id: boardOpen, op }, extra || {})); }
 function prefill(id, text) {
@@ -868,10 +966,9 @@ function prefill(id, text) {
 function renderBoard() {
   const el = $('board');
   const b = boardOpen && boards[boardOpen], s = boardOpen && byId(boardOpen);
-  document.body.classList.toggle('boarded', !!(b && s));
-  if (!b || !s) { el.hidden = true; if (boardOpen && !b) boardOpen = ''; return; }
+  if (!b || !s) { el.hidden = true; if (boardOpen && !b) boardOpen = ''; drawerClass(); return; }
   if (!el.hidden && el.contains(document.activeElement) && document.activeElement.matches('input[type=text], .edit')) return;   // do not redraw under your typing
-  el.hidden = false;
+  el.hidden = false; drawerClass();
   el.style.top = $('main').getBoundingClientRect().top + 'px';
   const synced = b.syncing ? 'syncing…' : b.syncedAt ? 'synced ' + ago(Math.round((Date.now() - b.syncedAt) / 1000)) : 'not synced yet';
   const item = (x) => {
@@ -981,9 +1078,308 @@ function editInline(host, value, done, label) {
   const inp = document.createElement('input'); inp.type = 'text'; inp.className = 'edit'; inp.value = value || ''; inp.setAttribute('aria-label', label);
   host.innerHTML = ''; host.appendChild(inp); host.onclick = null; inp.focus(); inp.select();
   let finished = false;
-  const finish = (save) => { if (finished) return; finished = true; const t = inp.value.trim(); inp.blur(); if (save && t !== (value || '')) done(t); setTimeout(renderBoard, 0); };
+  const finish = (save) => { if (finished) return; finished = true; const t = inp.value.trim(); inp.blur(); if (save && t !== (value || '')) done(t); setTimeout(() => { renderBoard(); renderResearch(); }, 0); };
   inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); });
   inp.addEventListener('blur', () => finish(true));
+}
+
+// ---------------- Research Companion (docs/RESEARCH.md) ----------------
+const RS_STATUS = { planned: ['○', 'planned'], running: ['⟳', 'running'], done: ['✓', 'done'], failed: ['✗', 'failed'], stopped: ['■', 'stopped'], dropped: ['–', 'dropped'] };
+const RUN_ICON = { running: '⟳', completed: '✓', failed: '✗', stopped: '■', unknown: '?', detached: '↗' };
+const RS_LOWER = /(^|_)(loss|mae|rmse|mse|wer|cer|ppl|perplexity|error|err)$/;
+const rsBetter = (k, a, b) => RS_LOWER.test(k) ? a < b : a > b;
+const rsFmt = (v) => Math.abs(v) >= 100 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(3) : (+v.toFixed(4)).toString();
+const rsDur = (ms) => { const m = Math.round(ms / 60e3); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : ''); };
+const rsSince = (t) => t ? ago(Math.max(1, Math.round((Date.now() - t) / 1000))) : '';
+function rsRunsOf(r, e) { return r.runs.filter(x => r.links[x.use] && r.links[x.use].exp === e.id); }
+function rsBest(r, e) {
+  const m = Object.assign({}, e.metrics || {});
+  for (const x of rsRunsOf(r, e)) if (!x.smoke) for (const [k, v] of Object.entries(x.metrics || {})) if (!(k in m) || rsBetter(k, v, m[k])) m[k] = v;
+  return m;
+}
+function rsKeys(r, exps) {
+  const n = {}; for (const e of exps) for (const k of Object.keys(rsBest(r, e))) n[k] = (n[k] || 0) + 1;
+  return Object.entries(n).sort((a, b) => b[1] - a[1]).map(x => x[0]);
+}
+function rsExpIn(r, e) { return !rsAgent || (e.agents || []).includes(rsAgent) || e.from === rsAgent || rsRunsOf(r, e).some(x => x.agent === rsAgent); }
+function rsQIn(r, q) { return !rsAgent || q.from === rsAgent || r.experiments.some(e => e.q === q.id && rsExpIn(r, e)); }
+function rsRunIn(x) { return (!rsAgent || x.agent === rsAgent || (x.manual && !x.agent)) && (rsShowSmoke || !x.smoke); }
+function rpost(op, extra) { post(Object.assign({ type: 'research', key: rsOpen, op }, extra || {})); }
+function researchFor(s) {
+  if (!s || !s.rkey) return;
+  if (!research[s.rkey]) {
+    post({ type: 'research', op: 'track', root: s.rroot });
+    rsPending[s.rkey] = { key: s.rkey, root: s.rroot, name: base(s.rroot), questions: [], experiments: [], links: {}, artifacts: [], runs: [], read: {}, syncing: s.id, syncedAt: 0, starting: Date.now() };
+    research[s.rkey] = rsPending[s.rkey];
+  }
+  openResearch(s.rkey, s.id);
+}
+function openResearch(key, agent) {
+  if (boardOpen) { boardOpen = ''; renderBoard(); }
+  rsOpen = key; rsAgent = rsFrom = agent || ''; renderResearch(); render();
+}
+function closeResearch() { rsOpen = ''; renderResearch(); render(); }
+function researchLine(s) {
+  const r = s.rkey && research[s.rkey];
+  if (!r) return '';
+  const exps = r.experiments.filter(e => (e.agents || []).includes(s.id) || e.from === s.id);
+  const running = r.runs.filter(x => x.agent === s.id && x.status === 'running' && !x.smoke).length;
+  const open = r.questions.filter(q => q.status === 'open').length;
+  return '⚗ Research · ' + [open + ' open question' + (open === 1 ? '' : 's'), exps.length + ' experiment' + (exps.length === 1 ? '' : 's') + ' by this agent',
+    running ? '⟳ ' + running + ' run' + (running === 1 ? '' : 's') + ' running' : ''].filter(Boolean).join(' · ');
+}
+function drawerClass() { document.body.classList.toggle('boarded', !$('board').hidden || !$('research').hidden); }
+
+function rsExpRow(r, e, opts) {
+  const o = opts || {};
+  const [icon, word] = RS_STATUS[e.status] || ['•', e.status];
+  const rl = rsRunsOf(r, e), runN = (st) => rl.filter(x => x.status === st && !x.smoke).length;
+  const counts = [['running', '⟳'], ['completed', '✓'], ['failed', '✗']].map(([st, ic2]) => runN(st) ? ic2 + runN(st) : '').filter(Boolean).join(' ');
+  const best = rsBest(r, e), k0 = Object.keys(best)[0];
+  const q = o.showQ && e.q && r.questions.find(x => x.id === e.q);
+  const open = rsOpenE.has(e.id);
+  let h = '<div class="rexp ' + esc(e.status) + (open ? ' open' : '') + '" data-e="' + esc(e.id) + '">' +
+    '<div class="rrow" tabindex="0" role="button" aria-expanded="' + open + '" title="Show or hide the details">' +
+    '<span class="ri" aria-label="' + esc(word) + '" title="' + esc(word) + '">' + icon + '</span>' +
+    '<div class="rtx"><span class="rt">' + esc(e.title) + '</span>' +
+    (e.src === 'you' ? '<span class="btag you" title="Yours">you</span>' : '') +
+    (e.verdict ? '<span class="rv ' + esc(e.verdict) + (e.vprobable ? ' prob' : '') + '" title="' + esc(e.evidence || (e.vprobable ? 'no evidence given' : '')) + '">' + esc(e.verdict) + '</span>' : '') +
+    '<div class="rm">' + esc([q ? q.text.slice(0, 60) : '', word, counts ? 'runs ' + counts : '', k0 ? k0 + ' ' + rsFmt(best[k0]) : '', !open && e.why ? 'why: ' + e.why : ''].filter(Boolean).join(' · ')) + '</div></div></div>';
+  if (open) {
+    const fld = (f, label, val, ph) => '<div class="rf"><b>' + label + '</b><span class="rval" data-f="' + f + '" title="Click to edit">' + (val ? esc(val) : '<i class="ph">' + esc(ph) + '</i>') + '</span>' +
+      ((e.locked || []).includes(f) ? '<span class="btag you" title="You wrote this: the sync leaves it alone">you</span>' : '') + '</div>';
+    const chips = (f, label) => '<div class="rf"><b>' + label + '</b><span class="rval" data-f="' + f + '" title="Click to edit (comma-separated)">' +
+      ((e[f] || []).length ? e[f].map(x => '<span class="rchip">' + esc(x) + '</span>').join('') : '<i class="ph">none yet</i>') + '</span></div>';
+    h += '<div class="rdet">' + fld('why', 'Why', e.why, 'why it was done (click to write)') + fld('expect', 'Expected', e.expect, 'the hypothesis') +
+      chips('data', 'Data') + chips('models', 'Models') + fld('result', 'Result', e.result, 'not yet') +
+      '<div class="rf"><b>Verdict</b><span class="rval" data-verdict="1" title="Set the verdict">' + (e.verdict ? esc(e.verdict) + (e.evidence ? ' · ' + esc(e.evidence) : '') + (e.vprobable ? ' (probably)' : '') : '<i class="ph">none</i>') + '</span></div>' +
+      fld('next', 'Next', e.next, 'what comes next');
+    const met = Object.entries(best);
+    if (met.length) h += '<div class="rf"><b>Numbers</b><span>' + met.map(([k, v]) => '<span class="rchip num">' + esc(k) + ' ' + rsFmt(v) + '</span>').join('') + '</span></div>';
+    if (rl.length) h += '<div class="rf"><b>Runs</b><div class="rruns">' + rl.slice(0, 8).map(x => rsRunRow(r, x, true)).join('') + '</div></div>';
+    const who = [...new Set([e.from, ...(e.agents || [])].filter(Boolean))].map(byId).filter(Boolean);
+    h += '<div class="rf"><b>From</b><span>' + (who.length ? who.map(s => '<button class="ghost rwho" data-open="' + esc(s.id) + '" title="Open its chat">' + Critters.critterSVG({ id: s.id, state: stateKey(s), size: 16, style: critterStyle() }) + esc(s.title.slice(0, 30)) + '</button>').join('') : e.src === 'you' ? 'you' : '<i class="ph">an agent not shown now</i>') +
+      ' <span class="rm">' + esc(e.at ? 'logged ' + rsSince(e.at) : '') + '</span></span></div>' +
+      '<div class="racts"><button class="ghost" data-a="status">' + ic('move') + 'Status</button><button class="ghost" data-a="ask">' + ic('ask') + 'Ask agent</button>' +
+      '<button class="ghost" data-a="moveq">' + ic('folder') + 'Question…</button><button class="ghost" data-a="rename">' + ic('rename') + 'Rename</button><button class="ghost" data-a="del" title="Delete; it will not come back">' + ic('trash') + '</button></div></div>';
+  }
+  return h + '</div>';
+}
+function rsRunRow(r, x, inExp) {
+  const s = byId(x.agent), link = r.links[x.use], e = link && link.exp && r.experiments.find(y => y.id === link.exp);
+  const when = x.status === 'running' ? 'started ' + rsSince(x.started) + (x.started ? ' · ' + rsDur(Date.now() - x.started) : '') :
+    x.status === 'unknown' ? 'started ' + rsSince(x.started) + ' · probably not running' : x.status === 'detached' ? 'started ' + rsSince(x.started) + ' · detached' :
+    x.status + ' ' + rsSince(x.ended || x.started) + (x.ended && x.started ? ' after ' + rsDur(x.ended - x.started) : '');
+  const what = [x.name || '', x.configs.length ? x.configs.slice(0, 3).join(', ') + (x.configs.length > 3 ? ' +' + (x.configs.length - 3) : '') : x.script, x.seed ? 'seed ' + x.seed : ''].filter(Boolean).join(' · ');
+  const met = Object.entries(x.metrics || {}).slice(-4);
+  return '<div class="rrun ' + esc(x.status) + (x.smoke ? ' smoke' : '') + '" data-run="' + esc(x.use) + '" title="' + esc(x.cmd || '') + '">' +
+    '<span class="ji" aria-label="' + esc(x.status) + '">' + (RUN_ICON[x.status] || '•') + '</span><div class="jt"><span>' + esc(x.title || x.script) + '</span>' +
+    (x.smoke ? ' <span class="btag">smoke test</span>' : '') + (x.manual ? ' <span class="btag you" title="Recorded by hand in the project memory">by hand</span>' : '') +
+    '<div class="jm">' + esc([inExp || !s ? '' : s.title.slice(0, 26), what, when].filter(Boolean).join(' · ')) + '</div>' +
+    (met.length || x.epoch ? '<div class="jm">' + (x.epoch ? 'epoch ' + esc(x.epoch) + ' ' : '') + met.map(([k, v]) => '<span class="rchip num">' + esc(k) + ' ' + rsFmt(v) + '</span>').join('') + '</div>' : '') +
+    (x.last && (x.status === 'running' || x.status === 'failed' || !met.length) ? '<div class="jm last">latest: ' + esc(x.last) + '</div>' : '') +
+    (inExp ? '' : '<div class="jm"><button class="ghost rlink" data-link="' + esc(x.use) + '" title="Which experiment is this run part of?">' + ic('folder') + esc(e ? e.title.slice(0, 50) : 'Link to an experiment…') + '</button>' +
+      (link && link.src === 'auto' ? ' <span class="btag" title="Linked by the sync">auto</span>' : '') + '</div>') +
+    '</div></div>';
+}
+function rsMemRow(r, m) {
+  const who = m.by === 'you' ? 'you' : m.by && byId(m.by) ? byId(m.by).title.slice(0, 26) : '';
+  const when = m.added || m.at || m.mtime;
+  const open = rsMemOpen.has(m.file);
+  const e = m.experiment && r.experiments.find(x => x.id === m.experiment);
+  return '<div class="rmem bitem" data-mem="' + esc(m.file) + '"><div class="tx"><span class="mt" title="Show or hide the full text" tabindex="0" role="button">' + esc(m.description || m.name) + '</span>' +
+    '<div class="rm">' + esc([who ? 'by ' + who : '', when ? new Date(when).toISOString().slice(0, 10) : '', m.edits > 1 ? 'updated ' + (m.edits - 1) + '×' : '', m.crewmon ? 'added in CrewMon' : '', e ? '→ experiment: ' + e.title.slice(0, 40) : ''].filter(Boolean).join(' · ')) + '</div>' +
+    (open ? '<div class="rmbody">' + esc(m.body) + '</div>' : '') + '</div>' +
+    '<span class="acts">' + (m.kind === 'idea' && !m.experiment ? '<button data-m="plan" title="Plan it: make it an experiment">' + ic('plus') + '</button>' : '') +
+    '<button data-m="kind" title="Kind: behavior, idea, run or note">' + ic('move') + '</button><button data-m="edit" title="' + (m.crewmon ? 'Edit' : 'Edit the file') + '">' + ic('rename') + '</button>' +
+    '<button data-m="open" title="Open the file">' + ic('open') + '</button><button data-m="del" title="Delete from Claude\'s memory">' + ic('trash') + '</button></span></div>';
+}
+function rsWireMem(el, r) {
+  el.querySelectorAll('.rmem[data-mem]').forEach(row => {
+    const m = (r.memory || []).find(x => x.file === row.dataset.mem);
+    if (!m) return;
+    const t = row.querySelector('.mt');
+    const toggle = () => { if (rsMemOpen.has(m.file)) rsMemOpen.delete(m.file); else rsMemOpen.add(m.file); renderResearch(); };
+    t.onclick = toggle; t.onkeydown = (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); ev.stopPropagation(); toggle(); } };
+    row.querySelectorAll('[data-m]').forEach(b => b.onclick = (ev) => {
+      const a = b.dataset.m;
+      if (a === 'open') rpost('openMemory', { file: m.file });
+      else if (a === 'del') rpost('deleteMemory', { file: m.file });
+      else if (a === 'edit') { if (!m.crewmon) rpost('openMemory', { file: m.file }); else editInline(t, m.body.split('\n\n')[0], (v) => rpost('editMemory', { file: m.file, text: v }), 'Memory'); }
+      else if (a === 'kind') openMenu([['Show it as', 'head']].concat([['behavior', 'Behavior: a rule for the agents'], ['idea', 'Idea: to try later'], ['run', 'Run: done elsewhere'], ['note', 'Note']].map(([k, l]) => [(m.kind === k ? '✓ ' : '') + l, () => rpost('memKind', { name: m.name, value: k })])), ev);
+      else if (a === 'plan') rpost('ideaToExperiment', { name: m.name, title: (m.description || m.name).slice(0, 140), why: 'From the idea in memory: ' + (m.description || m.name) });
+    });
+  });
+  if ($('rmkind')) $('rmkind').onchange = () => { rsMemKind = $('rmkind').value; renderResearch(); setTimeout(() => $('rmtext') && $('rmtext').focus(), 0); };
+  const inp = $('rmtext');
+  if (inp) inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter' && inp.value.trim()) { rpost('addMemory', { kind: $('rmkind').value, text: inp.value.trim() }); inp.value = ''; } if (e.key === 'Escape') inp.blur(); });
+  if ($('rsendrules')) $('rsendrules').onclick = (ev) => {
+    ev.stopPropagation();
+    const rules = (r.memory || []).filter(m => m.kind === 'behavior').map((m, i) => (i + 1) + ') ' + (m.description || m.name));
+    post({ type: 'send', ids: [rsFrom], text: 'Project rules from my notes, to follow from now on: ' + rules.join(' ') + ' Reply in one line that you have them.' });
+  };
+}
+function renderResearch() {
+  const el = $('research');
+  const r = rsOpen && research[rsOpen];
+  if (!r) { el.hidden = true; if (rsOpen && !r) rsOpen = ''; drawerClass(); return; }
+  if (!el.hidden && el.contains(document.activeElement) && document.activeElement.matches('input[type=text], .edit')) return;   // do not redraw under your typing
+  el.hidden = false; drawerClass();
+  el.style.top = $('main').getBoundingClientRect().top + 'px';
+  const agent = rsFrom && byId(rsFrom);
+  const reading = r.syncing && byId(r.syncing);
+  const exps = r.experiments.filter(e => rsExpIn(r, e)), qs = r.questions.filter(q => rsQIn(r, q)), runs = r.runs.filter(rsRunIn);
+  const nRun = runs.filter(x => x.status === 'running').length, nFail = exps.filter(e => e.status === 'failed').length;
+  let h = '<h3>' + ic('flask') + '<span class="t">Research · ' + esc(r.name) + '</span><button class="ghost" id="rclose" title="Close (Esc)" aria-label="Close">' + ic('x') + '</button></h3>' +
+    '<div class="sub"><span>' + esc(reading ? 'reading "' + reading.title.slice(0, 40) + '"…' : r.syncedAt ? 'updated ' + rsSince(r.syncedAt) : r.starting ? 'starting…' : 'not read yet') + '</span>' +
+    (agent && rsAgent && r.read && r.read[agent.id] ? '<span>this agent read ' + esc(rsSince(r.read[agent.id])) + '</span>' : '') +
+    (r.lastError ? '<span class="err" title="' + esc(r.lastError) + '">problem: ' + esc(r.lastError.slice(0, 60)) + '</span>' : '') + '</div>' +
+    '<div class="rscope" role="group" aria-label="Show">' + (agent ? '<button class="ghost' + (rsAgent ? ' on' : '') + '" id="rsAgentBtn" aria-pressed="' + !!rsAgent + '">' + Critters.critterSVG({ id: agent.id, state: stateKey(agent), size: 16, style: critterStyle() }) + esc(agent.title.slice(0, 28)) + '</button>' : '') +
+    '<button class="ghost' + (!rsAgent ? ' on' : '') + '" id="rsAllBtn" aria-pressed="' + !rsAgent + '">' + ic('folder') + 'Whole project</button></div>' +
+    '<div class="rsum">' + [qs.filter(q => q.status === 'open').length + ' open question' + (qs.filter(q => q.status === 'open').length === 1 ? '' : 's'),
+      exps.length + ' experiment' + (exps.length === 1 ? '' : 's'), nRun ? '<b class="busy">⟳ ' + nRun + ' running</b>' : '', nFail ? '<b class="bad">✗ ' + nFail + ' failed</b>' : ''].filter(Boolean).join(' · ') + '</div>' +
+    '<div class="rtabs" role="tablist">' + [['questions', 'Questions'], ['plan', 'Plan'], ['compare', 'Compare'], ['runs', 'Runs (' + runs.length + ')'], ['memory', 'Memory (' + (r.memory || []).length + ')']].map(([k, l]) =>
+      '<button role="tab" class="ghost' + (rsTab === k ? ' on' : '') + '" aria-selected="' + (rsTab === k) + '" data-tab="' + k + '">' + esc(l) + '</button>').join('') + '</div><div class="rbody">';
+  if (!r.questions.length && !r.experiments.length && (r.starting || reading))
+    h += '<div class="rempty">Reading the agents\' chats in <b>' + esc(r.name) + '</b>. The first read takes up to a minute per agent; questions, experiments and runs appear here as they are found.</div>';
+  if (rsTab === 'questions') {
+    for (const q of qs) {
+      const qe = r.experiments.filter(e => e.q === q.id && rsExpIn(r, e));
+      h += '<div class="rq ' + esc(q.status) + '" data-q="' + esc(q.id) + '"><div class="rqh"><span class="rqs" data-qstatus="1" title="Status: click to change">' + esc(q.status) + '</span>' +
+        '<span class="qt" title="Double-click to edit">' + esc(q.text) + '</span>' + (q.src === 'you' ? '<span class="btag you">you</span>' : '') +
+        '<span class="acts"><button data-qa="adde" title="Add an experiment to this question">' + ic('plus') + '</button><button data-qa="ask" title="Ask the agent about this question">' + ic('ask') + '</button><button data-qa="del" title="Delete the question (its experiments stay)">' + ic('trash') + '</button></span></div>' +
+        '<div class="rf"><b>Why</b><span class="rval" data-qf="why">' + (q.why ? esc(q.why) : '<i class="ph">why it matters (click to write)</i>') + '</span></div>' +
+        (q.answer || q.status !== 'open' ? '<div class="rf"><b>Answer</b><span class="rval" data-qf="answer">' + (q.answer ? esc(q.answer) + (q.aprobable ? ' (probably)' : '') : '<i class="ph">none yet</i>') + '</span></div>' : '') +
+        (qe.length ? qe.map(e => rsExpRow(r, e)).join('') : '<div class="bempty">no experiments yet</div>') + '</div>';
+    }
+    const loose = exps.filter(e => !e.q || !r.questions.some(q => q.id === e.q));
+    if (loose.length) h += '<div class="rq loose"><div class="rqh"><span class="qt">Not tied to a question</span></div>' + loose.map(e => rsExpRow(r, e)).join('') + '</div>';
+    if (!qs.length && !loose.length && !(r.starting || reading)) h += '<div class="rempty">No research questions yet' + (rsAgent ? ' for this agent' : '') + '. They appear when the agents discuss what they are testing and why, or add one below.</div>';
+    h += '<div class="add"><input type="text" id="raddq" placeholder="Add a research question…  (Enter)" aria-label="New research question"></div>';
+  } else if (rsTab === 'plan') {
+    const ideas = (r.memory || []).filter(m => m.kind === 'idea' && !m.experiment);
+    if (ideas.length) h += '<div class="bsec"><h4 title="Ideas in the project memory, not planned yet">Ideas <span class="n">' + ideas.length + '</span></h4>' + ideas.map(m => rsMemRow(r, m)).join('') + '</div>';
+    for (const [st, label] of [['running', 'Running'], ['planned', 'Planned'], ['done', 'Done'], ['failed', 'Failed'], ['stopped', 'Stopped'], ['dropped', 'Dropped']]) {
+      const list = exps.filter(e => e.status === st).sort((a, b) => (b.updated || 0) - (a.updated || 0));
+      if (!list.length && !['running', 'planned'].includes(st)) continue;
+      const shut = rsShut.has(st);
+      h += '<div class="bsec ' + st + '"><h4 data-plan="' + st + '" title="Show or hide" style="cursor:pointer">' + label + ' <span class="n">' + list.length + '</span>' + (shut ? ' ▸' : ' ▾') + '</h4>' +
+        (shut ? '' : list.length ? list.map(e => rsExpRow(r, e, { showQ: true })).join('') : '<div class="bempty">' + (st === 'running' ? 'nothing running' : 'nothing planned') + '</div>') + '</div>';
+    }
+    h += '<div class="add"><input type="text" id="radde" placeholder="Plan an experiment…  (Enter)" aria-label="New planned experiment"></div>';
+  } else if (rsTab === 'compare') {
+    const pool = exps.filter(e => !rsQ || e.q === rsQ);
+    const keys = rsKeys(r, pool);
+    const metric = keys.includes(rsMetric) ? rsMetric : keys[0] || '';
+    h += '<div class="rcmp-q"><select id="rsq" aria-label="Question"><option value="">All questions</option>' + r.questions.filter(q => rsQIn(r, q)).map(q => '<option value="' + esc(q.id) + '"' + (q.id === rsQ ? ' selected' : '') + '>' + esc(q.text.slice(0, 70)) + '</option>').join('') + '</select></div>';
+    if (!keys.length) h += '<div class="rempty">No numbers yet. They appear when the agents report results, or when a run\'s output has metrics such as <i>val_acc=0.81</i>.</div>';
+    else {
+      h += '<div class="rmetrics" role="group" aria-label="Metric">' + keys.slice(0, 10).map(k => '<button class="ghost' + (k === metric ? ' on' : '') + '" data-metric="' + esc(k) + '">' + esc(k) + '</button>').join('') + '</div>' +
+        '<div class="note">' + esc(metric) + ': ' + (RS_LOWER.test(metric) ? 'lower is better' : 'higher is better') + '; the best value per experiment, its own reported number first.</div>';
+      const rows = pool.map(e => ({ e, v: rsBest(r, e)[metric] })).filter(x => x.v != null).sort((a, b) => rsBetter(metric, a.v, b.v) ? -1 : 1);
+      const max = Math.max(...rows.map(x => Math.abs(x.v)), 1e-9);
+      h += '<div class="rbars">' + rows.map((x, i) => '<div class="rbar' + (i === 0 ? ' top' : '') + '" data-e="' + esc(x.e.id) + '" title="' + esc(x.e.title + (x.e.result ? ' — ' + x.e.result : '')) + '"><span class="rbl">' + esc(x.e.title) + '</span>' +
+        '<span class="rbt"><span class="rbf" style="width:' + Math.max(2, Math.round(100 * Math.abs(x.v) / max)) + '%"></span></span><span class="rbv">' + rsFmt(x.v) + '</span></div>').join('') + '</div>';
+      const cols = keys.slice(0, 4);
+      const tops = Object.fromEntries(cols.map(k => { const vals = pool.map(e => rsBest(r, e)[k]).filter(v => v != null); return [k, vals.length > 1 ? vals.reduce((a, b) => rsBetter(k, a, b) ? a : b) : null]; }));
+      h += '<div class="rtable-wrap"><table class="rtable"><thead><tr><th>Experiment</th>' + cols.map(k => '<th title="' + esc(k) + '">' + esc(k.length > 14 ? k.slice(0, 13) + '…' : k) + '</th>').join('') + '<th>Verdict</th></tr></thead><tbody>' +
+        pool.filter(e => cols.some(k => rsBest(r, e)[k] != null)).map(e => { const b = rsBest(r, e); return '<tr><td title="' + esc(e.title) + '">' + esc(e.title) + '</td>' + cols.map(k => '<td class="' + (b[k] != null && b[k] === tops[k] ? 'best' : '') + '">' + (b[k] != null ? rsFmt(b[k]) : '') + '</td>').join('') + '<td>' + esc(e.verdict || '') + '</td></tr>'; }).join('') +
+        '</tbody></table></div>';
+    }
+  } else if (rsTab === 'memory') {
+    const mem = r.memory || [];
+    const hint = { behavior: 'a rule for the agents, e.g. Always report the mean of 3 seeds', idea: 'something to try later, e.g. Try 10 s windows', run: 'a run done elsewhere, e.g. Cluster: masked v2 seed 7, test_acc=0.774', note: 'something to keep, e.g. RealDISP self-placed data is invalid' };
+    h += '<div class="note">Claude Code\'s memory for <b>' + esc(r.name) + '</b>: every new agent in this folder loads it. What you add here is saved there; what the agents save shows here, with who saved it and when.</div>' +
+      '<div class="add rmemadd"><select id="rmkind" aria-label="Kind">' + [['behavior', 'Behavior'], ['idea', 'Idea'], ['run', 'Run'], ['note', 'Note']].map(([k, l]) => '<option value="' + k + '"' + (k === rsMemKind ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>' +
+      '<input type="text" id="rmtext" placeholder="' + esc(hint[rsMemKind]) + '" aria-label="Add to memory"></div>';
+    for (const [k, label] of [['behavior', 'Behaviors'], ['idea', 'Ideas'], ['run', 'Runs recorded by hand'], ['note', 'Notes']]) {
+      const list = mem.filter(m => m.kind === k);
+      if (!list.length) continue;
+      h += '<div class="bsec"><h4>' + label + ' <span class="n">' + list.length + '</span>' + (k === 'behavior' && rsFrom && byId(rsFrom) ? '<button class="ghost rsendrules" id="rsendrules" title="Send these rules to ' + esc(byId(rsFrom).title) + ' now">' + ic('send') + 'Send to agent</button>' : '') + '</h4>' + list.map(m => rsMemRow(r, m)).join('') + '</div>';
+    }
+    if (!mem.length) h += '<div class="rempty">Nothing in this project\'s memory yet.</div>';
+  } else if (rsTab === 'runs') {
+    h += '<label class="chk rsmoke"><input type="checkbox" id="rsmoke"' + (rsShowSmoke ? ' checked' : '') + '> show smoke tests</label>';
+    h += runs.length ? runs.map(x => rsRunRow(r, x, false)).join('') : '<div class="rempty">No runs found' + (rsAgent ? ' for this agent' : '') + '. A run is a command that launches an experiment: a training or evaluation script, a queue, <i>python -m &lt;pkg&gt; run config.yaml</i>, torchrun, sbatch…</div>';
+  }
+  h += '</div>';
+  const arts = (r.artifacts || []).slice().reverse();
+  if (arts.length) h += '<div class="bsec"><h4 id="rarts" style="cursor:pointer" title="Show or hide">Artifacts <span class="n">' + arts.length + '</span>' + (rsArtsOpen ? ' ▾' : ' ▸') + '</h4>' +
+    (rsArtsOpen ? arts.map(a => '<div class="bitem" data-art="' + esc(a.id) + '"><span aria-hidden="true">' + (a.kind === 'chart' ? '📊' : a.kind === 'writeup' ? '✍' : '📄') + '</span><div class="tx"><a href="#" data-aopen="1">' + esc(a.title) + '</a> <span class="rm">' + esc(rsSince(a.at)) + '</span></div>' +
+      '<span class="acts"><button data-arm="1" title="Remove from the list (the file stays)">' + ic('x') + '</button></span></div>').join('') : '') + '</div>';
+  h += '<div class="foot"><button class="ghost" id="rsync"' + (r.syncing ? ' disabled' : '') + ' title="Read the new turns of this project\'s agents now">' + ic('sync') + 'Sync now</button>' +
+    '<button class="ghost" id="rmake" title="Make a results table, a chart, notes or a write-up">' + ic('chart') + 'Make…</button>' +
+    '<button class="ghost" id="rcopy" title="Copy the research notes as Markdown">' + ic('copy') + 'Copy notes</button>' +
+    '<button class="ghost" id="runtrack" title="Stop Research Companion for this project; everything is kept">' + ic('x') + 'Stop</button></div>';
+  el.innerHTML = h;
+  // ---- wiring ----
+  rsWireMem(el, r);
+  $('rclose').onclick = closeResearch;
+  if ($('rsAgentBtn')) $('rsAgentBtn').onclick = () => { rsAgent = agent.id; renderResearch(); };
+  $('rsAllBtn').onclick = () => { rsAgent = ''; renderResearch(); };
+  el.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { rsTab = b.dataset.tab; renderResearch(); });
+  el.querySelectorAll('[data-open]').forEach(b => b.onclick = (ev) => { ev.stopPropagation(); post({ type: 'open', id: b.dataset.open }); });
+  $('rsync').onclick = () => { rpost('sync'); r.syncing = r.syncing || '…'; renderResearch(); };
+  $('rcopy').onclick = () => rpost('copy');
+  $('runtrack').onclick = () => rpost('untrack');
+  $('rmake').onclick = (ev) => {
+    const keys = rsKeys(r, exps.filter(e => !rsQ || e.q === rsQ)), metric = keys.includes(rsMetric) ? rsMetric : keys[0];
+    const q = rsTab === 'compare' ? rsQ : '';
+    openMenu([['Make an artifact' + (q ? ' for this question' : ''), 'head'], ['Results table (Markdown)', () => rpost('artifact', { kind: 'table', q })],
+      ['Chart of ' + (metric || 'a metric') + ' (SVG)', () => rpost('artifact', { kind: 'chart', q, metric }), metric ? '' : 'No numbers yet'],
+      ['Research notes (Markdown)', () => rpost('artifact', { kind: 'notes' })], ['Write-up by Haiku (Markdown)', () => rpost('artifact', { kind: 'writeup', q })]], ev);
+  };
+  if ($('rarts')) $('rarts').onclick = () => { rsArtsOpen = !rsArtsOpen; renderResearch(); };
+  el.querySelectorAll('[data-art]').forEach(row => {
+    row.querySelector('[data-aopen]').onclick = (ev) => { ev.preventDefault(); rpost('openArtifact', { id: row.dataset.art }); };
+    row.querySelector('[data-arm]').onclick = () => rpost('removeArtifact', { id: row.dataset.art });
+  });
+  el.querySelectorAll('[data-plan]').forEach(h4 => h4.onclick = () => { const k = h4.dataset.plan; if (rsShut.has(k)) rsShut.delete(k); else rsShut.add(k); renderResearch(); });
+  el.querySelectorAll('[data-metric]').forEach(b => b.onclick = () => { rsMetric = b.dataset.metric; renderResearch(); });
+  el.querySelectorAll('.rbar[data-e]').forEach(b => b.onclick = () => { rsTab = 'questions'; rsOpenE.add(b.dataset.e); renderResearch(); });
+  if ($('rsq')) $('rsq').onchange = () => { rsQ = $('rsq').value; renderResearch(); };
+  if ($('rsmoke')) $('rsmoke').onchange = () => { rsShowSmoke = $('rsmoke').checked; renderResearch(); };
+  const enter = (inp, fn) => inp && inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter' && inp.value.trim()) { fn(inp.value.trim()); inp.value = ''; } if (e.key === 'Escape') inp.blur(); });
+  enter($('raddq'), (t) => rpost('addQuestion', { text: t }));
+  enter($('radde'), (t) => rpost('addExperiment', { title: t }));
+  el.querySelectorAll('[data-link]').forEach(b => b.onclick = (ev) => {
+    const run = b.dataset.link;
+    openMenu([['Part of which experiment?', 'head']].concat(r.experiments.slice().sort((a, c) => (c.updated || 0) - (a.updated || 0)).slice(0, 25).map(e => [e.title.slice(0, 60), () => rpost('link', { run, exp: e.id })]), [['-'], ['Not part of an experiment', () => rpost('link', { run, exp: '' })]]), ev);
+  });
+  const askAbout = (agentId, text) => { const s = byId(agentId); if (s) prefill(s.id, text); };
+  el.querySelectorAll('.rq[data-q]').forEach(box => {
+    const q = r.questions.find(x => x.id === box.dataset.q);
+    if (!q) return;
+    box.querySelector('.qt').ondblclick = () => editInline(box.querySelector('.qt'), q.text, (t) => rpost('set', { kind: 'q', id: q.id, field: 'text', value: t }), 'Question');
+    box.querySelector('[data-qstatus]').onclick = (ev) => openMenu([['Status', 'head']].concat(['open', 'answered', 'dropped'].map(st => [st, () => rpost('set', { kind: 'q', id: q.id, field: 'status', value: st })])), ev);
+    box.querySelectorAll(':scope > .rf [data-qf]').forEach(v => v.onclick = () => editInline(v, q[v.dataset.qf], (t) => rpost('set', { kind: 'q', id: q.id, field: v.dataset.qf, value: t }), v.dataset.qf));
+    box.querySelector('[data-qa=adde]').onclick = () => {
+      const host = document.createElement('div'); host.className = 'add'; box.appendChild(host);
+      editInline(host, '', (t) => rpost('addExperiment', { title: t, q: q.id }), 'New experiment');
+      host.querySelector('input').placeholder = 'New experiment for this question…  (Enter)';
+    };
+    box.querySelector('[data-qa=ask]').onclick = () => askAbout(rsAgent || q.from || (sel()[0] || {}).id, 'About the research question "' + q.text + '": ');
+    box.querySelector('[data-qa=del]').onclick = () => rpost('delete', { kind: 'q', id: q.id });
+  });
+  el.querySelectorAll('.rexp[data-e]').forEach(box => {
+    const e = r.experiments.find(x => x.id === box.dataset.e);
+    if (!e) return;
+    const row = box.querySelector('.rrow');
+    const toggle = () => { if (rsOpenE.has(e.id)) rsOpenE.delete(e.id); else rsOpenE.add(e.id); renderResearch(); };
+    row.onclick = toggle; row.onkeydown = (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); ev.stopPropagation(); toggle(); } };
+    box.querySelectorAll('.rdet [data-f]').forEach(v => v.onclick = () => editInline(v, Array.isArray(e[v.dataset.f]) ? e[v.dataset.f].join(', ') : e[v.dataset.f],
+      (t) => rpost('set', { kind: 'e', id: e.id, field: v.dataset.f, value: t }), v.dataset.f));
+    const vd = box.querySelector('[data-verdict]');
+    if (vd) vd.onclick = (ev) => openMenu([['Does the result support the hypothesis?', 'head']].concat(['supports', 'refutes', 'unclear'].map(x => [x, () => rpost('set', { kind: 'e', id: e.id, field: 'verdict', value: x })]), [['-'], ['No verdict', () => rpost('set', { kind: 'e', id: e.id, field: 'verdict', value: '' })]]), ev);
+    box.querySelectorAll('.racts [data-a]').forEach(b => b.onclick = (ev) => {
+      const a = b.dataset.a;
+      if (a === 'status') openMenu([['Status', 'head']].concat(Object.keys(RS_STATUS).map(st => [RS_STATUS[st][0] + ' ' + st, () => rpost('set', { kind: 'e', id: e.id, field: 'status', value: st })])), ev);
+      else if (a === 'ask') askAbout(rsAgent || (e.agents || [])[0] || e.from, 'About the experiment "' + e.title + '": ');
+      else if (a === 'moveq') openMenu([['Which question does it answer?', 'head']].concat(r.questions.map(q => [q.text.slice(0, 60), () => rpost('set', { kind: 'e', id: e.id, field: 'q', value: q.id })]), [['-'], ['None', () => rpost('set', { kind: 'e', id: e.id, field: 'q', value: '' })]]), ev);
+      else if (a === 'rename') { const t = box.querySelector('.rt'); editInline(t, e.title, (v) => rpost('set', { kind: 'e', id: e.id, field: 'title', value: v }), 'Experiment'); }
+      else if (a === 'del') rpost('delete', { kind: 'e', id: e.id });
+    });
+  });
 }
 
 // ---------------- dock ----------------
@@ -1262,6 +1658,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'b' && !e.ctrlKey && !e.metaKey && !e.altKey) { setTray(!trayUp); return; }
   if (e.key === '?') { $('help').style.display = $('help').style.display === 'block' ? 'none' : 'block'; return; }
   if (e.key === 'Escape' && boardOpen) { closeBoard(); return; }
+  if (e.key === 'Escape' && rsOpen) { closeResearch(); return; }
   if (e.key === 'Escape') { $('menu').style.display = 'none'; $('help').style.display = 'none'; toggleView(false); toggleAct(false); toggleInbox(false); clearSel(); return; }
   if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
     e.preventDefault();
@@ -1293,6 +1690,7 @@ document.addEventListener('keydown', (e) => {
   else if (k === 'd') post({ type: 'role', id: one.id, title: one.title, desc: role(one) });
   else if (k === 'k') keepAlive(one);
   else if (k === 't') { if (boardOpen === one.id) closeBoard(); else boardFor(one); }
+  else if (k === 'e') { if (rsOpen && rsOpen === one.rkey) closeResearch(); else researchFor(one); }
   else if (e.key === 'Delete') post({ type: 'keeper', action: 'delete', id: one.id, title: one.title });
 });
 $('helpbtn').onclick = () => { $('help').style.display = $('help').style.display === 'block' ? 'none' : 'block'; };
@@ -1327,10 +1725,12 @@ window.addEventListener('message', (e) => {
     activity = m.data.activity || []; pending = m.data.pending || []; renderLate(); if (!$('act').hidden) renderActivity();
     drive = m.data.drive || drive; if (!$('inbox').hidden) renderInbox();
     boards = m.data.boards || {};
+    research = m.data.research || {};
+    for (const k of Object.keys(rsPending)) { if (research[k] || Date.now() - rsPending[k].starting > 60e3) delete rsPending[k]; else research[k] = rsPending[k]; }
     renderVersions(m.data.versions || {});
     for (const id of [...selected]) if (!byId(id)) selected.delete(id);
     if (drag) return;   // do not redraw under the pointer while dragging
-    try { renderKeeper(); renderMessenger(); render(); drawArrows(); renderBoard(); }
+    try { renderKeeper(); renderMessenger(); render(); drawArrows(); renderBoard(); renderResearch(); }
     catch (err) { $('groups').innerHTML = '<p style="color:var(--vscode-errorForeground)">CrewMon could not draw the map: ' + esc(err.message) +
       '. If you just updated it, run "Developer: Reload Window".</p>'; }
   }

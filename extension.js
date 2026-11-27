@@ -11,6 +11,7 @@ const { execFile, execFileSync } = require('child_process');
 const { snapshot, runningSessions, ROLES, AUTO, GROUPS } = require('./snapshot');
 const { claudeBin, tmuxBin } = require('./processes');
 const Board = require('./board');
+const Research = require('./research');
 const { pendingRequests, STARTS } = require('./delivery');
 
 // The keeper (keeps chats running on the machine when VS Code closes them): ~/.local/bin/keeper, else the bundled copy.
@@ -521,6 +522,191 @@ function boardsForView(sessions) {
   return out;
 }
 
+// ---- Research Companion (docs/RESEARCH.md): questions, experiments, runs and results, per project, from the agents' chats ----
+let researchBusy = '';               // "<project key>:<session id>" being read
+const researchForce = new Set();     // project keys: "Sync now", or just started
+function researchSync(sessions) {
+  if (researchBusy) return;
+  const now = Date.now();
+  for (const r of Object.values(Research.all())) {
+    if (!r.tracked) continue;
+    const mine = sessions.filter(s => s.rkey === r.key && s.file);
+    const forced = researchForce.has(r.key);
+    const s = mine.find(x => forced ? x.state !== 'busy' && (x.size || 0) > ((r.agents[x.id] || {}).syncedSize || 0) + 200 : Research.due(r, x, now));
+    if (!s) { if (forced && !mine.some(x => x.state === 'busy')) researchForce.delete(r.key); continue; }
+    runResearchSync(r, s);
+    return;                          // one chat at a time
+  }
+}
+function runResearchSync(r, s) {
+  const a = r.agents[s.id] || {};
+  let ex;
+  try { ex = Research.excerpt(s.file, a.syncedSize || 0); } catch (e) { r.lastError = 'could not read a chat: ' + e.message; Research.save(r); return; }
+  if (!a.syncedSize && s.summary) ex.text = 'SUMMARY OF EARLIER WORK ' + s.summary.replace(/\s+/g, ' ').slice(0, 6000) + '\n' + ex.text;
+  const fresh = Research.load(r.key) || r;
+  fresh.agents[s.id] = Object.assign({}, fresh.agents[s.id] || {}, { title: s.title, lastTry: Date.now() });
+  const bin = claudeBin();
+  if (!cfg('researchSync', true) || !bin || !ex.text.trim()) {
+    fresh.agents[s.id].syncedSize = ex.end;
+    fresh.lastError = !bin && cfg('researchSync', true) ? 'Claude Code not found for the sync' : '';
+    Research.save(fresh); push(); return;
+  }
+  Research.save(fresh);
+  researchBusy = r.key + ':' + s.id; push();
+  const runList = runsOf(s), ids = {};
+  for (const x of runList) ids[x.id] = x.use;
+  const cwd = path.dirname(AUTO);     // CrewMon's own folder: these helper runs are not drawn on the map
+  fs.mkdirSync(cwd, { recursive: true });
+  execFile(claudeBin(), ['-p', Research.prompt(fresh, ex, s.title, runList, memoryOf(fresh, lastSessions)), '--model', 'haiku', '--no-session-persistence', '--tools', '', '--strict-mcp-config',
+                 '--setting-sources', 'user'], { env: haikuEnv(), cwd, timeout: 180000, maxBuffer: 4 << 20 }, (err, stdout) => {
+    researchBusy = '';
+    const cur = Research.load(r.key) || fresh;      // your edits made while Haiku was thinking are kept
+    try {
+      if (err) throw new Error(err.killed ? 'Haiku took too long' : (err.message || String(err)).split('\n')[0]);
+      const res = Research.applyOps(cur, Research.parseReply(stdout), s.id, ids);
+      cur.agents[s.id] = Object.assign({}, cur.agents[s.id] || {}, { title: s.title, syncedSize: ex.end, syncedAt: Date.now() });
+      Object.assign(cur, { syncedAt: Date.now(), lastError: '', lastResult: res });
+    } catch (e) {
+      cur.lastError = String(e.message || e).slice(0, 200);    // syncedSize unchanged: the same turns are read again next time
+    }
+    Research.save(cur); push();
+  });
+}
+const runCache = new Map();          // id -> {key, val}: runs, re-read when the chat grows (or every 30 s, for their logs)
+function runsOf(s) {
+  const key = s.size + ':' + (s.state === 'offline') + ':' + Math.floor(Date.now() / 30e3);
+  const c = runCache.get(s.id);
+  if (c && c.key === key) return c.val;
+  let val = [];
+  try { val = Research.runs(s.file, { offline: s.state === 'offline' }); } catch (_) { /* unreadable: none */ }
+  runCache.set(s.id, { key, val });
+  return val;
+}
+const memEventCache = new Map();    // session id -> {size, val}
+function memoryOf(r, sessions) {
+  const mine = (sessions || []).filter(s => s.rkey === r.key);
+  const dirs = [Research.memoryDirOf(r.root)].concat(mine.map(s => path.join(os.homedir(), '.claude', 'projects', s.project, 'memory')));
+  const items = Research.readMemory(dirs);
+  const events = [];
+  for (const s of mine) if (s.file) {
+    let c = memEventCache.get(s.id);
+    if (!c || c.size !== s.size) { let val = []; try { val = Research.memoryEvents(s.file); } catch (_) { /* unreadable */ } c = { size: s.size, val }; memEventCache.set(s.id, c); }
+    for (const e of c.val) events.push(Object.assign({ agent: s.id }, e));
+  }
+  for (const m of items) {
+    const ev = events.filter(e => e.file === m.file || (e.name === m.name && path.dirname(e.file) === m.dir)).sort((a, b) => a.at - b.at);
+    m.by = ev.length ? ev[0].agent : m.crewmon ? 'you' : '';
+    m.added = ev.length ? ev[0].at : m.at || 0;
+    m.edits = ev.length;
+    if (r.memKinds && r.memKinds[m.name]) m.kind = r.memKinds[m.name];
+    m.experiment = r.ideas && r.ideas[m.name] || '';
+  }
+  return items;
+}
+function researchForView(sessions) {
+  const out = {};
+  for (const r of Object.values(Research.all())) if (r.tracked) {
+    const mine = (sessions || []).filter(s => s.rkey === r.key);
+    const runs = [];
+    for (const s of mine) if (s.file) for (const x of runsOf(s)) runs.push(Object.assign({ agent: s.id }, x));
+    const memory = memoryOf(r, sessions);
+    for (const m of memory) if (m.kind === 'run') runs.push(Object.assign({ agent: m.by && m.by !== 'you' ? m.by : '' }, Research.memoryRun(m)));
+    runs.sort((a, b) => b.started - a.started);
+    out[r.key] = { memory: memory.map(m => Object.assign({}, m, { body: m.body.slice(0, 1500) })), memDir: Research.memoryDirOf(r.root), key: r.key, root: r.root, name: r.name, questions: r.questions, experiments: r.experiments, links: r.links, artifacts: r.artifacts,
+      syncedAt: r.syncedAt, lastError: r.lastError, lastResult: r.lastResult || null, runs: runs.slice(0, 100),
+      syncing: researchBusy.startsWith(r.key + ':') ? researchBusy.slice(r.key.length + 1) : '',
+      read: Object.fromEntries(Object.entries(r.agents).map(([k, v]) => [k, v.syncedAt || 0])) };
+  }
+  return out;
+}
+function allRuns(r) {
+  const out = [];
+  for (const m of memoryOf(r, lastSessions)) if (m.kind === 'run') out.push(Research.memoryRun(m));
+  for (const s of lastSessions.filter(x => x.rkey === r.key && x.file)) for (const x of runsOf(s)) out.push(x);
+  return out;
+}
+async function openArtifactFile(file) {
+  const uri = vscode.Uri.file(file);
+  if (/\.md$/.test(file)) { await vscode.window.showTextDocument(uri, { preview: false }); vscode.commands.executeCommand('markdown.showPreviewToSide', uri).then(() => {}, () => {}); }
+  else await vscode.commands.executeCommand('vscode.open', uri);
+}
+async function researchAction(m) {
+  if (m.op === 'track') {
+    if (!m.root) return;
+    const key = Research.keyOf(m.root);
+    const r = Research.load(key) || Research.empty(m.root);
+    r.tracked = true; Research.save(r); researchForce.add(key);
+    vscode.window.setStatusBarMessage(`CrewMon: Research Companion is reading the "${r.name}" chats; questions and experiments appear in a moment`, 6000);
+    push(); return;
+  }
+  const r = Research.load(m.key);
+  if (!r) return;
+  if (m.op === 'untrack') {
+    const ok = await vscode.window.showInformationMessage(`Stop Research Companion for "${r.name}"? Everything is kept; opening it again brings it back.`, { modal: true }, 'Stop');
+    if (ok !== 'Stop') return;
+    r.tracked = false; Research.save(r);
+  } else if (m.op === 'sync') {
+    researchForce.add(r.key); researchSync(lastSessions);
+  } else if (m.op === 'copy') {
+    await vscode.env.clipboard.writeText(Research.notesMarkdown(r, allRuns(r), memoryOf(r, lastSessions)));
+    vscode.window.setStatusBarMessage('CrewMon: research notes copied as Markdown', 3000);
+    return;
+  } else if (m.op === 'artifact') {
+    const runList = allRuns(r);
+    const dir = Research.artifactDir(r.key); fs.mkdirSync(dir, { recursive: true });
+    const q = m.q ? r.questions.find(x => x.id === m.q) : null;
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '-');
+    const slug = (q ? q.text : r.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40).replace(/-$/, '');
+    let file, title, text;
+    if (m.kind === 'table') { file = path.join(dir, stamp + '-results-' + slug + '.md'); title = 'Results table'; text = Research.tableMarkdown(r, runList, m.q || ''); }
+    else if (m.kind === 'notes') { file = path.join(dir, stamp + '-notes-' + slug + '.md'); title = 'Research notes'; text = Research.notesMarkdown(r, runList, memoryOf(r, lastSessions)); }
+    else if (m.kind === 'chart') {
+      const metric = m.metric || Research.metricKeys(r, runList, r.experiments.filter(e => !m.q || e.q === m.q))[0];
+      if (!metric) { vscode.window.showInformationMessage('CrewMon: no numbers to chart yet. They appear once the agents report results.'); return; }
+      file = path.join(dir, stamp + '-chart-' + metric.replace(/[^\w]+/g, '_') + '-' + slug + '.svg'); title = 'Chart: ' + metric; text = Research.chartSVG(r, runList, metric, m.q || '');
+    } else if (m.kind === 'writeup') {
+      const bin = claudeBin();
+      if (!bin) { vscode.window.showWarningMessage('CrewMon: Claude Code was not found, so the write-up cannot be made.'); return; }
+      file = path.join(dir, stamp + '-writeup-' + slug + '.md'); title = 'Write-up';
+      vscode.window.setStatusBarMessage('CrewMon: writing the summary…', 60000);
+      text = await new Promise((res) => execFile(bin, ['-p', Research.writeupPrompt(r, runList, m.q || '', memoryOf(r, lastSessions)), '--model', 'haiku', '--no-session-persistence', '--tools', '',
+        '--strict-mcp-config', '--setting-sources', 'user'], { env: haikuEnv(), cwd: path.dirname(AUTO), timeout: 180000, maxBuffer: 4 << 20 }, (err, out) => res(err ? '' : out)));
+      vscode.window.setStatusBarMessage('', 1);
+      if (!text.trim()) { vscode.window.showWarningMessage('CrewMon: the write-up could not be made; try again.'); return; }
+      text = '_Written by Haiku from the Research Companion notes on ' + new Date().toISOString().slice(0, 10) + '. Check it against the runs before using it._\n\n' + text.trim() + '\n';
+    } else return;
+    fs.writeFileSync(file, text);
+    const cur = Research.load(r.key) || r;
+    cur.artifacts.push({ id: 'a' + Date.now().toString(36), kind: m.kind, title: title + (q ? ': ' + q.text.slice(0, 60) : ''), file, q: m.q || '', at: Date.now() });
+    cur.artifacts = cur.artifacts.slice(-60);
+    Research.save(cur);
+    await openArtifactFile(file);
+  } else if (m.op === 'openArtifact') {
+    const a = r.artifacts.find(x => x.id === m.id);
+    if (!a) return;
+    if (!fs.existsSync(a.file)) { r.artifacts = r.artifacts.filter(x => x !== a); Research.save(r); vscode.window.showWarningMessage('CrewMon: that file is gone; removed it from the list.'); }
+    else await openArtifactFile(a.file);
+  } else if (m.op === 'addMemory') {
+    const file = Research.writeMemory(Research.memoryDirOf(r.root), m.kind, m.text);
+    if (file) vscode.window.setStatusBarMessage(`CrewMon: saved to Claude's memory for "${r.name}"; new agents there load it`, 5000);
+  } else if (m.op === 'editMemory' || m.op === 'deleteMemory' || m.op === 'openMemory') {
+    const item = memoryOf(r, lastSessions).find(x => x.file === m.file);     // only files that belong to this project
+    if (!item) return;
+    if (m.op === 'openMemory' || (m.op === 'editMemory' && !item.crewmon)) { await vscode.window.showTextDocument(vscode.Uri.file(item.file), { preview: false }); return; }
+    if (m.op === 'editMemory') Research.editMemory(item.file, m.text);
+    else {
+      const ok = await vscode.window.showWarningMessage(`Delete "${item.description || item.name}" from Claude's memory for this project? Agents will no longer load it.`, { modal: true }, 'Delete');
+      if (ok !== 'Delete') return;
+      Research.deleteMemory(item.file);
+    }
+  } else if (m.op === 'removeArtifact') {
+    r.artifacts = r.artifacts.filter(x => x.id !== m.id); Research.save(r);
+  } else {
+    Research.userEdit(r, m); Research.save(r);
+  }
+  push();
+}
+
 // ---- "In charge of" one-liners: made by a small model from each session's latest summary, cached in auto.json ----
 const describing = new Set();
 let describeBusy = false;
@@ -618,7 +804,9 @@ async function push() {
   const k = await runKeeper(extRoot, ['status', '--json']);
   try { data.keeper = k.ok ? JSON.parse(k.out) : null; } catch (_) { data.keeper = null; }
   describeQueue(data.sessions || []);
+  for (const x of data.sessions || []) { x.rroot = Research.projectRoot(x.startCwd || x.cwd || ''); x.rkey = x.rroot ? Research.keyOf(x.rroot) : ''; }
   try { boardSync(data.sessions || []); } catch (e) { console.error('CrewMon board sync', e); }
+  try { researchSync(data.sessions || []); } catch (e) { console.error('CrewMon research sync', e); }
   if (Date.now() - lastModCheck > 30000) { lastModCheck = Date.now(); messengerUpToDate(extRoot).catch(() => {}); }
   data.chips = cfg('quickMessages', DEFAULT_CHIPS);
   data.critter = cfg('critter', 'bot');
@@ -637,6 +825,7 @@ async function push() {
   data.activity = ib.activity;
   data.drive = ib.drive;
   data.boards = boardsForView(data.sessions);
+  data.research = researchForView(data.sessions);
   data.pending = ib.pending;
   const slim = Object.assign({}, data, { sessions: (data.sessions || []).map(s => Object.assign({}, s, { summary: undefined })) });
   if (panel) panel.webview.postMessage({ type: 'data', data: slim });
@@ -700,6 +889,7 @@ function open(context) {
   panel.webview.onDidReceiveMessage(async (m) => {
     if (m.type === 'ready' || m.type === 'refresh') push();
     else if (m.type === 'board') await boardAction(m);
+    else if (m.type === 'research') await researchAction(m);
     else if (m.type === 'tray') await context.globalState.update('trayUp', !!m.up);
     else if (m.type === 'open') await openChat(m.id);
     else if (m.type === 'message') await openChat(m.id, m.text);

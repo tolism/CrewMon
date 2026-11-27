@@ -23,6 +23,9 @@ are still running, and which you left days ago. CrewMon turns them into a small 
 - **▦ Work boards**: *Track* an agent and CrewMon keeps a board of its work, drawn from its chat:
   **Now · Waiting on you · Next · Later · Done**, plus your **Vision** line. You add, tick, pin and move items; the
   agent never has to keep it.
+- **⚗️ Research Companion**: for agents doing research, the project's **research questions**, the **experiments**
+  tried to answer them (why, expected, data, models, result, verdict), the **runs** that launched them and their
+  numbers, side by side. Drawn from the chats; results tables, charts and write-ups on request.
 - **💬 Message from the map**: select an agent, type, press Enter, or click a quick chip (*Status?*, *Continue*,
   *Summarise where you are*). Select several to message them all.
 - **🤝 Agent to agent**: drag one critter onto another to **hand over** work, **ask** a question, or let them
@@ -120,6 +123,25 @@ the card shows one line (*Now: … · 1 waiting on you · 2 next*), and **Board*
   **Sync now**, **Copy** (as Markdown) and **Untrack** (the board is kept) are at the top.
 - Design and rules: [docs/BOARD.md](docs/BOARD.md).
 
+### Research Companion
+Click **Research** on an agent's card (or press **E**). Research Companion reads the chats of that project's agents
+and keeps one record of the research: what is being asked, what was tried and **why**, and what came of it.
+
+<p align="center"><img src="docs/screenshot-research.png" width="900" alt="Research Companion: a research question with its experiments; one experiment opened to show why, expected, data, models, result, verdict, numbers and runs"></p>
+
+- **Questions** · **Plan** · **Compare** · **Runs**: the questions with their experiments; experiments by status
+  (running, planned, done…); bars and a table of a metric across experiments; every run with its status, duration,
+  latest output line and numbers. Switch between **this agent** and the **whole project**.
+- **Runs are found without AI**, from the commands the agents ran (training and evaluation scripts, queues,
+  `python -m <pkg> run config.yaml`, torchrun, sbatch…); their numbers come from their output.
+- **Questions, experiments, reasons and results** are read by a small model (Haiku) when an agent goes idle after new
+  turns, under fixed rules: numbers are copied, never invented; what you edit stays yours; a verdict needs evidence.
+- **Make…** writes a results table, a chart, research notes, or a short write-up, and opens it in VS Code.
+- **Memory**: add a **behavior** (a rule for the agents), an **idea**, a **run** done elsewhere, or a **note**; it is
+  saved into Claude Code's own memory for the project, so every new agent there loads it. What the agents saved
+  when you said "remember…" shows too, with who saved it and when.
+- Design and rules: [docs/RESEARCH.md](docs/RESEARCH.md).
+
 ### Drag and drop
 - **Onto another critter** (or use **Hand over…** / **Ask…** in the agent card, or the right-click menu, and pick
   the other agent from a list):
@@ -133,7 +155,8 @@ the card shows one line (*Now: … · 1 waiting on you · 2 next*), and **Board*
 - **In the Free layout**: drag a critter anywhere; CrewMon remembers where.
 
 ### Keyboard
-`←` `→` `↑` `↓` move · `Enter` open · `M` message · `R` rename · `D` description · `K` keep alive · `Del` trash ·
+`←` `→` `↑` `↓` move · `Enter` open · `M` message · `R` rename · `D` description · `K` keep alive · `T` work board ·
+`E` Research Companion · `B` roll the bottom bar · `Del` trash ·
 `/` filter · `Esc` clear · `?` help
 
 ## The messenger: talking to agents directly
@@ -201,6 +224,7 @@ back.
 | `crewmon.refreshSeconds` | 5 | how often the map refreshes |
 | `crewmon.aiDescriptions` | true | write the one-line *In charge of* with a small model (Haiku), once per summary |
 | `crewmon.boardSync` | true | keep tracked agents' boards up to date with Haiku when they go idle after new turns |
+| `crewmon.researchSync` | true | Research Companion: read new turns of a tracked project's agents with Haiku when they go idle |
 | `crewmon.quickMessages` | 6 chips | the one-click messages under the message bar |
 | `crewmon.driveBlockedFolders` | `[]` | folders whose agents may not hand over through Google Drive |
 | `crewmon.critter` | `bot` | how agents are drawn: `bot`, `blob` or `bug` (also in the top bar) |
@@ -215,7 +239,10 @@ back.
   (`keeper restore <id>` brings them back; `keeper purge` empties it for good).
 - AI descriptions are made with your own Claude login (`claude -p --model haiku`, no tools, nothing saved as a chat).
   Turn them off with `crewmon.aiDescriptions`. Work boards use the same way, only for agents you track, and only
-  when they have new turns; `crewmon.boardSync` turns that off. Boards are kept in `~/.claude/crewmon/boards/`.
+  when they have new turns; `crewmon.boardSync` turns that off. Boards are kept in `~/.claude/crewmon/boards/`. Research Companion works the same way, only for projects you
+  open it on; `crewmon.researchSync` turns the reading off. Its records and artifacts are in `~/.claude/crewmon/research/`.
+  Its **Memory** tab writes only when you add, edit or delete there (Claude Code's memory files for that project,
+  `~/.claude/projects/<folder>/memory/`); deleting asks first.
 - Messages sent through CrewMon are normal messages to your agents. They act on them with the permissions those chats
   already have.
 
@@ -239,6 +266,8 @@ package.json        extension manifest (command, Ctrl+Alt+A, settings)
 extension.js        the VS Code side: the tab, refresh, actions, keeper, messenger, AI descriptions
 processes.js        which chats are running (Linux: /proc; macOS: ps + Claude Code's session files; Windows: session files)
 delivery.js         requests the messenger has not picked up
+board.js            work boards: storage, reading the chat, the rules
+research.js         Research Companion: storage, finding runs, metrics, the rules, artifacts
 snapshot.js         reads the sessions (node snapshot.js prints them in a terminal)
 media/map.html      the map
 media/critters.js   the critters: three styles, 11 accessories, a pose per state

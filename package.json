@@ -2,7 +2,7 @@
   "name": "crewmon",
   "displayName": "CrewMon",
   "description": "CrewMon (Crew Monitor): a live map of your Claude Code agents. Hover for what each one is in charge of, click to open it, keep it running with the keeper.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "publisher": "tolism",
   "license": "MIT",
   "engines": {
@@ -46,6 +46,11 @@
           "type": "boolean",
           "default": true,
           "description": "Write a one-line 'In charge of' for each session from its latest summary, with a small model (Haiku). Cached; redone only when a new summary appears."
+        },
+        "crewmon.researchSync": {
+          "type": "boolean",
+          "default": true,
+          "description": "Research Companion: read new turns of a tracked project's agents with a small model (Haiku), when an agent goes idle, to keep its questions, experiments and results up to date. Off: only runs (found without AI) and your own items."
         },
         "crewmon.boardSync": {
           "type": "boolean",
